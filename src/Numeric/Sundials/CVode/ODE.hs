@@ -117,6 +117,7 @@ C.include "<nvector/nvector_serial.h>"    -- serial N_Vector types, fcts., macro
 C.include "<sunmatrix/sunmatrix_dense.h>" -- access to dense SUNMatrix
 C.include "<sunlinsol/sunlinsol_dense.h>" -- access to dense SUNLinearSolver
 C.include "<cvode/cvode_direct.h>"        -- access to CVDls interface
+C.include "<cvode/cvode_diag.h>"          -- CVDiag
 C.include "<sundials/sundials_types.h>"   -- definition of type realtype
 C.include "<sundials/sundials_math.h>"
 C.include "../../../helpers.h"
@@ -451,16 +452,6 @@ solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
 
                          if (check_flag(&flag, "CVodeRootInit", 1)) return(1);
 
-                         /* Initialize dense matrix data structure and solver */
-                         A = SUNDenseMatrix(NEQ, NEQ);
-                         if (check_flag((void *)A, "SUNDenseMatrix", 0)) return 1;
-                         LS = SUNDenseLinearSolver(y, A);
-                         if (check_flag((void *)LS, "SUNDenseLinearSolver", 0)) return 1;
-
-                         /* Attach matrix and linear solver */
-                         flag = CVDlsSetLinearSolver(cvode_mem, LS, A);
-                         if (check_flag(&flag, "CVDlsSetLinearSolver", 1)) return 1;
-
                          /* Set the initial step size if there is one */
                          if ($(int isInitStepSize)) {
                            /* FIXME: We could check if the initial step size is 0 */
@@ -471,8 +462,22 @@ solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
 
                          /* Set the Jacobian if there is one */
                          if ($(int isJac)) {
+                           /* Initialize dense matrix data structure and solver */
+                           A = SUNDenseMatrix(NEQ, NEQ);
+                           if (check_flag((void *)A, "SUNDenseMatrix", 0)) return 1;
+                           LS = SUNDenseLinearSolver(y, A);
+                           if (check_flag((void *)LS, "SUNDenseLinearSolver", 0)) return 1;
+
+                           /* Attach matrix and linear solver */
+                           flag = CVDlsSetLinearSolver(cvode_mem, LS, A);
+                           if (check_flag(&flag, "CVDlsSetLinearSolver", 1)) return 1;
+
+                           /* Set the Jacobian */
                            flag = CVDlsSetJacFn(cvode_mem, $fun:(int (* jacIO) (double t, SunVector y[], SunVector fy[], SunMatrix Jac[], void * params, SunVector tmp1[], SunVector tmp2[], SunVector tmp3[])));
                            if (check_flag(&flag, "CVDlsSetJacFn", 1)) return 1;
+                         } else /* Else we use CVDiag directly */ {
+                           flag = CVDiag(cvode_mem);
+                           if (check_flag(&flag, "CVDiag", 1)) return 1;
                          }
 
                          /* Store initial conditions */
