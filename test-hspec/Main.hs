@@ -2,19 +2,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-name-shadowing #-}
 
 import qualified Numeric.Sundials.ARKode.ODE as ARK
 import qualified Numeric.Sundials.CVode.ODE  as CV
 import           Numeric.LinearAlgebra as L
 import           Numeric.Sundials.Types
 
-import           Plots as P
-import qualified Diagrams.Prelude as D
-import           Diagrams.Backend.Rasterific
 import qualified Data.Vector.Storable as V
 
-import           Control.Lens
 import           Control.Monad
 import           Data.Coerce
 import           Foreign.C.Types
@@ -25,32 +21,6 @@ import Control.Monad.IO.Class
 import System.IO
 import Katip
 
-
-lorenz :: Double -> [Double] -> [Double]
-lorenz _t u = [ sigma * (y - x)
-              , x * (rho - z) - y
-              , x * y - beta * z
-              ]
-  where
-    rho = 28.0
-    sigma = 10.0
-    beta = 8.0 / 3.0
-    x = u !! 0
-    y = u !! 1
-    z = u !! 2
-
-_lorenzJac :: Double -> Vector Double -> Matrix Double
-_lorenzJac _t u = (3><3) [ (-sigma), rho - z, y
-                        , sigma   , -1.0   , x
-                        , 0.0     , (-x)   , (-beta)
-                        ]
-  where
-    rho = 28.0
-    sigma = 10.0
-    beta = 8.0 / 3.0
-    x = u ! 0
-    y = u ! 1
-    z = u ! 2
 
 brusselator :: Double -> [Double] -> [Double]
 brusselator _t x = [ a - (w + 1) * u + v * u * u
@@ -322,29 +292,6 @@ robertsonWithJacobian ts usejac = CV.odeSolveRootVWith' opts
                    , initStep = Nothing
                    }
 
-lSaxis :: [[Double]] -> P.Axis B D.V2 Double
-lSaxis xs = P.r2Axis &~ do
-  let zs = xs!!0
-      us = xs!!1
-      vs = xs!!2
-      ws = xs!!3
-  P.linePlot' $ zip zs us
-  P.linePlot' $ zip zs vs
-  P.linePlot' $ zip zs ws
-
-lSaxis2 :: [[Double]] -> P.Axis B D.V2 Double
-lSaxis2 xs = P.r2Axis &~ do
-  let zs = xs!!0
-      us = xs!!1
-      vs = xs!!2
-  P.linePlot' $ zip zs us
-  P.linePlot' $ zip zs vs
-
-kSaxis :: [(Double, Double)] -> P.Axis B D.V2 Double
-kSaxis xs = P.r2Axis &~ do
-  P.linePlot' xs
-
-
 main :: IO ()
 main = do
   handleScribe <- mkHandleScribe ColorIfTerminal stderr (permitItem InfoS) V2
@@ -353,19 +300,10 @@ main = do
   runKatipT log_env $ do
 
   res1 <- ARK.odeSolve brusselator [1.2, 3.1, 3.0] (fromList [0.0, 0.1 .. 10.0])
-  liftIO $ renderRasterific "diagrams/brusselator.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ lSaxis $ [0.0, 0.1 .. 10.0]:(toLists $ tr res1))
 
   res1a <- ARK.odeSolve brusselator [1.2, 3.1, 3.0] (fromList [0.0, 0.1 .. 10.0])
-  liftIO $ renderRasterific "diagrams/brusselatorA.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ lSaxis $ [0.0, 0.1 .. 10.0]:(toLists $ tr res1a))
 
   res2 <- ARK.odeSolve stiffish [0.0] (fromList [0.0, 0.1 .. 10.0])
-  liftIO $ renderRasterific "diagrams/stiffish.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ kSaxis $ zip [0.0, 0.1 .. 10.0] (concat $ toLists res2))
 
   res2a <- ARK.odeSolveV (ARK.SDIRK_5_3_4') Nothing 1e-6 1e-10 stiffishV (fromList [0.0]) (fromList [0.0, 0.1 .. 10.0])
 
@@ -382,33 +320,8 @@ main = do
   let maxDiffC = maximum $ map abs $
                  zipWith (-) ((toLists $ tr res2b)!!0) ((toLists $ tr res2c)!!0)
 
-  res3 <- ARK.odeSolve lorenz [-5.0, -5.0, 1.0] (fromList [0.0, 0.01 .. 20.0])
-
-  liftIO $ renderRasterific "diagrams/lorenz.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ kSaxis $ zip ((toLists $ tr res3)!!0) ((toLists $ tr res3)!!1))
-
-  liftIO $ renderRasterific "diagrams/lorenz1.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ kSaxis $ zip ((toLists $ tr res3)!!0) ((toLists $ tr res3)!!2))
-
-  liftIO $ renderRasterific "diagrams/lorenz2.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ kSaxis $ zip ((toLists $ tr res3)!!1) ((toLists $ tr res3)!!2))
-
   res4 <- CV.odeSolve predatorPrey [0.5, 1.0, 2.0] (fromList [0.0, 0.01 .. 10.0])
 
-  liftIO $ renderRasterific "diagrams/predatorPrey.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ kSaxis $ zip ((toLists $ tr res4)!!0) ((toLists $ tr res4)!!1))
-
-  liftIO $ renderRasterific "diagrams/predatorPrey1.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ kSaxis $ zip ((toLists $ tr res4)!!0) ((toLists $ tr res4)!!2))
-
-  liftIO $ renderRasterific "diagrams/predatorPrey2.png"
-                   (D.dims2D 500.0 500.0)
-                   (renderAxis $ kSaxis $ zip ((toLists $ tr res4)!!1) ((toLists $ tr res4)!!2))
 
   res4a <- ARK.odeSolve predatorPrey [0.5, 1.0, 2.0] (fromList [0.0, 0.01 .. 10.0])
 
@@ -438,22 +351,9 @@ main = do
           CV.SolverError _ -> error "solver failed"
             True
 
-  brussRoot >>= \case
-    CV.SolverSuccess events m _diagn -> do
-      liftIO $ renderRasterific
-        "diagrams/brussRoot.png"
-        (D.dims2D 500.0 500.0)
-        (renderAxis $ lSaxis $ toLists $ tr m)
-    CV.SolverError e ->
-      liftIO $ expectationFailure $ show $ errorCode e
-
   let boundedSineSpec = do
         runKatipT log_env boundedSine >>= \case
           CV.SolverSuccess events m _ -> do
-            liftIO $ renderRasterific
-              "diagrams/boundedSine.png"
-              (D.dims2D 500.0 500.0)
-              (renderAxis $ lSaxis2 $ toLists $ tr m)
             length events `shouldBe` 3
             map rootDirection events `shouldBe` [Upwards, Downwards, Upwards]
             map eventIndex events `shouldBe` [0, 1, 0]
