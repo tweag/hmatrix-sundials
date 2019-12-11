@@ -37,9 +37,17 @@ main = do
   let ?log_env = log_env
 
   defaultMain $ testGroup "Tests"
-    [ testGroup (show method) . return $
-        withVsWithoutJacobian (defaultOpts method) solveCV
-    | method <- [CV.BDF, CV.ADAMS]
+    [
+      testGroup solver_name
+      [ testGroup (show method) $
+          let opts = defaultOpts method in
+          [ withVsWithoutJacobian opts solver
+          , eventTests opts solver
+          ]
+      | method <- [CV.BDF, CV.ADAMS]
+      ]
+    | (solver, solver_name) <-
+      [ (solveCV, "CVode") ]
     ]
 
 withVsWithoutJacobian opts solver = testGroup "With vs without jacobian"
@@ -48,6 +56,15 @@ withVsWithoutJacobian opts solver = testGroup "With vs without jacobian"
       Right (solutionMatrix -> solNoJac) <- runKatipT ?log_env $ solver opts prob { odeJacobian = Nothing }
       assertBool "Difference too large" $ norm_2 (solJac - solNoJac) < 1e-3
   | (name, prob) <- [ brusselator ]
+  ]
+
+eventTests opts solver = testGroup "Events"
+  [ testCase "Exponential" $ do
+      Right (eventInfo -> events) <- runKatipT ?log_env $ solver opts exponential
+      length events @?= 1
+      assertBool "Difference too large" (abs (eventTime (events!!0) - log 1.1) < 1e-4)
+      rootDirection (events!!0) @?= Upwards
+      eventIndex (events!!0) @?= 0
   ]
 
 {-
@@ -106,47 +123,19 @@ brusselator = (,) "brusselator" $ OdeProblem
     b = 3.5
     eps = 5.0e-6
 
-{-
-brusselator :: Double -> [Double] -> [Double]
-brusselator _t x = [ a - (w + 1) * u + v * u * u
-                   , w * u - v * u * u
-                   , (b - w) / eps - w * u
-                   ]
+exponential = OdeProblem
+  { odeRhs = OdeRhsHaskell . coerce $ \(_ :: Double) y -> vector [y ! 0]
+  , odeJacobian = Nothing
+  , odeInitCond = vector [1]
+  , odeEvents = events
+  , odeMaxEvents = 100
+  , odeSolTimes = vector [ fromIntegral k / 100 | k <- [0..(22::Int)]]
+  }
   where
-    a = 1.0
-    b = 3.5
-    eps = 5.0e-6
-    u = x !! 0
-    v = x !! 1
-    w = x !! 2
-
-brussJac :: Double -> Vector Double -> Matrix Double
-brussJac _t x = tr $
-  (3><3) [ (-(w + 1.0)) + 2.0 * u * v, w - 2.0 * u * v, (-w)
-         , u * u                     , (-(u * u))     , 0.0
-         , (-u)                      , u              , (-1.0) / eps - u
-         ]
-  where
-    y = toList x
-    u = y !! 0
-    v = y !! 1
-    w = y !! 2
-    eps = 5.0e-6
-
-brusselatorWithJacobian :: (MonadIO m, Katip m) => Vector Double -> Bool -> m CV.SolverResult
-brusselatorWithJacobian ts usejac = CV.odeSolveRootVWith' opts
-                      (OdeRhsHaskell . coerce $ \t v -> vector $ brusselator t (toList v))
-                      (if usejac then Just brussJac else Nothing)
-                      (vector [1.2, 3.1, 3.0])
-                      [] 0
-                      ts
-  where
-    opts = ODEOpts { maxNumSteps = 10000
-                   , minStep     = 1.0e-12
-                   , maxFail     = 10
-                   , odeMethod = CV.BDF
-                   , stepControl = CV.XX' 1.0e-6 1.0e-10 1 1
-                   , initStep = Nothing
-                   }
-
--}
+    events =
+      [ EventSpec { eventCondition = \_ y -> y ! 0 - 1.1
+                     , eventUpdate = \_ _ -> vector [ 2 ]
+                     , eventDirection = Upwards
+                     , eventStopSolver = False
+                     }
+      ]
