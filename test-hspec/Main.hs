@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wall -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wall -Wno-name-shadowing -Wno-incomplete-patterns -Wno-type-defaults #-}
 
 import qualified Numeric.Sundials.ARKode.ODE as ARK
 import qualified Numeric.Sundials.CVode.ODE  as CV
@@ -97,15 +97,15 @@ brussRootFn _ v = case xs of
 
 exponential :: (MonadIO m, Katip m) => m CV.SolverResult
 exponential = CV.odeSolveRootVWith' opts
-                      (OdeRhsHaskell . coerce $ \(t :: Double) y -> vector [y ! 0])
+                      (OdeRhsHaskell . coerce $ \(_ :: Double) y -> vector [y ! 0])
                       Nothing
                       (vector [1])
                       events 100
                       (vector [ fromIntegral k / 100 | k <- [0..(22::Int)]])
   where
     events =
-      [ EventSpec { eventCondition = \t y -> y ! 0 - 1.1
-                     , eventUpdate = \ev y -> vector [ 2 ]
+      [ EventSpec { eventCondition = \_ y -> y ! 0 - 1.1
+                     , eventUpdate = \_ _ -> vector [ 2 ]
                      , eventDirection = Upwards
                      , eventStopSolver = False
                      }
@@ -195,7 +195,7 @@ roberts = OdeRhsHaskell . coerce $ \(t :: Double) v -> vector $ robertsAux t (to
     robertsAux _ _ = error "roberts RHS not defined"
 
 robertsJac :: Double -> Vector Double -> Matrix Double
-robertsJac _t (toList -> [y1, y2, y3]) = (3 >< 3)
+robertsJac _t (toList -> [_, y2, y3]) = (3 >< 3)
   [ -0.04, 1.0e4 * y3, 1.0e4 * y2
   , 0.04, -1.0e4*y3 - 3.0e7*2*y2, -1.0e4*y2
   , 0, 3.0e7*2*y2, 0
@@ -272,7 +272,7 @@ solve1 = CV.odeSolveRootVWith' opts
                    }
     events =
       [ EventSpec { eventCondition = \t _y -> t - 1.0
-                     , eventUpdate = \t y -> vector [2.0, y!1, y!2]
+                     , eventUpdate = \_ y -> vector [2.0, y!1, y!2]
                      , eventDirection = AnyDirection
                      , eventStopSolver = False
                      }
@@ -298,12 +298,6 @@ main = do
   log_env <- registerScribe "stderr" handleScribe defaultScribeSettings =<< initLogEnv "test" "devel"
 
   runKatipT log_env $ do
-
-  res1 <- ARK.odeSolve brusselator [1.2, 3.1, 3.0] (fromList [0.0, 0.1 .. 10.0])
-
-  res1a <- ARK.odeSolve brusselator [1.2, 3.1, 3.0] (fromList [0.0, 0.1 .. 10.0])
-
-  res2 <- ARK.odeSolve stiffish [0.0] (fromList [0.0, 0.1 .. 10.0])
 
   res2a <- ARK.odeSolveV (ARK.SDIRK_5_3_4') Nothing 1e-6 1e-10 stiffishV (fromList [0.0]) (fromList [0.0, 0.1 .. 10.0])
 
@@ -353,7 +347,7 @@ main = do
 
   let boundedSineSpec = do
         runKatipT log_env boundedSine >>= \case
-          CV.SolverSuccess events m _ -> do
+          CV.SolverSuccess events _ _ -> do
             length events `shouldBe` 3
             map rootDirection events `shouldBe` [Upwards, Downwards, Upwards]
             map eventIndex events `shouldBe` [0, 1, 0]
@@ -472,12 +466,12 @@ main = do
         length (eventInfo soln1) `shouldBe` 10
         odeMaxEventsReached (diagnostics soln2) `shouldBe` False
       it "Stops the solver when requested" $ do
-        let solve max_events = CV.odeSolveWithEvents
+        let solve _ = CV.odeSolveWithEvents
               opts
               [EventSpec
                 { eventCondition = \_ y -> y V.! 0 - 1
                 , eventDirection = Upwards
-                , eventUpdate = \_ y -> V.singleton 42
+                , eventUpdate = \_ _ -> V.singleton 42
                 , eventStopSolver = True
                 }
               ]
