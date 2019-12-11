@@ -57,7 +57,7 @@ test-suite hmatrix-sundials-testsuite
                        hspec,
                        hmatrix-sundials,
                        katip
-  hs-source-dirs:      test
+  hs-source-dirs:      test-hspec
   extra-libraries:     sundials_arkode,
                        sundials_cvode
   c-sources:           src/helpers.c
