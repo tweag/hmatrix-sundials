@@ -82,6 +82,7 @@ eventTests opts solver = testGroup "Events"
                         }
             ]
           , odeMaxEvents = 100
+          , odeSolTimes = [0,100]
           }
       length events @?= 100
   ]
@@ -178,8 +179,8 @@ robertson = (,) "Robertson" $ OdeProblem
   , odeInitCond = [1.0, 0.0, 0.0]
   , odeEvents = []
   , odeMaxEvents = 0
-  , odeSolTimes = [0,10]
-  , odeTolerances = CV.XX' 1.0e-4 1.0e-11 1 1
+  , odeSolTimes = [0,5]
+  , odeTolerances = defaultTolerances -- FIXME how to make this integrate indefinitely, as in the sundials example?
   }
 
 largeTs :: V.Vector Double
