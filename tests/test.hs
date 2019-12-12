@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, ScopedTypeVariables, OverloadedStrings,
-             ViewPatterns, ImplicitParams #-}
+             ViewPatterns, ImplicitParams, OverloadedLists #-}
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -119,7 +119,7 @@ brusselator = (,) "brusselator" $ OdeProblem
         u = x V.! 0
         v = x V.! 1
         w = x V.! 2
-      in V.fromList
+      in
       [ a - (w + 1) * u + v * u * u
       , w * u - v * u * u
       , (b - w) / eps - w * u
@@ -136,8 +136,8 @@ brusselator = (,) "brusselator" $ OdeProblem
       ]
   , odeEvents = mempty
   , odeMaxEvents = 0
-  , odeInitCond = V.fromList [1.2, 3.1, 3.0]
-  , odeSolTimes = V.fromList [0.0, 0.1 .. 10.0]
+  , odeInitCond = [1.2, 3.1, 3.0]
+  , odeSolTimes = [0.0, 0.1 .. 10.0]
   , odeTolerances = defaultTolerances
   }
   where
@@ -147,7 +147,7 @@ brusselator = (,) "brusselator" $ OdeProblem
     eps = 5.0e-6
 
 exponential = OdeProblem
-  { odeRhs = OdeRhsHaskell $ \_ y -> V.fromList [y V.! 0]
+  { odeRhs = OdeRhsHaskell $ \_ y -> [y V.! 0]
   , odeJacobian = Nothing
   , odeInitCond = vector [1]
   , odeEvents = events
@@ -165,7 +165,7 @@ exponential = OdeProblem
       ]
 
 robertson = (,) "Robertson" $ OdeProblem
-  { odeRhs = OdeRhsHaskell $ \_ (V.toList -> [y1,y2,y3]) -> V.fromList
+  { odeRhs = OdeRhsHaskell $ \_ (V.toList -> [y1,y2,y3]) ->
       [ -0.04 * y1 + 1.0e4 * y2 * y3
       , 0.04 * y1 - 1.0e4 * y2 * y3 - 3.0e7 * (y2)^(2 :: Int)
       , 3.0e7 * (y2)^(2 :: Int)
@@ -175,10 +175,10 @@ robertson = (,) "Robertson" $ OdeProblem
       , 0.04, -1.0e4*y3 - 3.0e7*2*y2, -1.0e4*y2
       , 0, 3.0e7*2*y2, 0
       ]
-  , odeInitCond = V.fromList [1.0, 0.0, 0.0]
+  , odeInitCond = [1.0, 0.0, 0.0]
   , odeEvents = []
   , odeMaxEvents = 0
-  , odeSolTimes = largeTs
+  , odeSolTimes = [0,10]
   , odeTolerances = CV.XX' 1.0e-4 1.0e-11 1 1
   }
 
