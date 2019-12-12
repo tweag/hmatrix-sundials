@@ -19,6 +19,7 @@ data OdeProblem = OdeProblem
   , odeJacobian :: Maybe (Double -> Vector Double -> Matrix Double)
   , odeInitCond :: V.Vector Double
   , odeSolTimes :: V.Vector Double
+  , odeTolerances :: StepControl
   }
 
 solveCV
@@ -27,7 +28,7 @@ solveCV
   -> OdeProblem
   -> m (Either ErrorDiagnostics SundialsSolution)
 solveCV opts OdeProblem{..} =
-  CV.odeSolveWithEvents opts odeEvents odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
+  CV.odeSolveWithEvents opts {stepControl = odeTolerances} odeEvents odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
 
 main = do
   handleScribe <- mkHandleScribe ColorIfTerminal stderr (permitItem InfoS) V2
@@ -101,9 +102,11 @@ defaultOpts method = ODEOpts
   , minStep     = 1.0e-12
   , maxFail     = 10
   , odeMethod   = method
-  , stepControl = CV.XX' 1.0e-6 1.0e-10 1 1
+  , stepControl = defaultTolerances
   , initStep    = Nothing
   }
+
+defaultTolerances = CV.XX' 1.0e-6 1.0e-10 1 1
 
 ----------------------------------------------------------------------
 --                           ODE problems
@@ -135,6 +138,7 @@ brusselator = (,) "brusselator" $ OdeProblem
   , odeMaxEvents = 0
   , odeInitCond = V.fromList [1.2, 3.1, 3.0]
   , odeSolTimes = V.fromList [0.0, 0.1 .. 10.0]
+  , odeTolerances = defaultTolerances
   }
   where
     a = 1.0
@@ -149,6 +153,7 @@ exponential = OdeProblem
   , odeEvents = events
   , odeMaxEvents = 100
   , odeSolTimes = vector [ fromIntegral k / 100 | k <- [0..(22::Int)]]
+  , odeTolerances = defaultTolerances
   }
   where
     events =
@@ -174,6 +179,7 @@ robertson = (,) "Robertson" $ OdeProblem
   , odeEvents = []
   , odeMaxEvents = 0
   , odeSolTimes = largeTs
+  , odeTolerances = CV.XX' 1.0e-4 1.0e-11 1 1
   }
 
 largeTs :: V.Vector Double
