@@ -43,12 +43,22 @@ main = do
           let opts = defaultOpts method in
           [ withVsWithoutJacobian opts solver
           , eventTests opts solver
+          , noErrorTests opts solver
           ]
       | method <- [CV.BDF, CV.ADAMS]
       ]
     | (solver, solver_name) <-
       [ (solveCV, "CVode") ]
     ]
+
+noErrorTests opts solver = testGroup "Absence of error"
+  [ testCase name $ do
+      r <- runKatipT ?log_env $ solver opts prob
+      case r of
+        Right _ -> return ()
+        Left e -> assertFailure (show e)
+  | (name, prob) <- [ empty ]
+  ]
 
 withVsWithoutJacobian opts solver = testGroup "With vs without jacobian"
   [ testCase name $ do
@@ -181,6 +191,16 @@ robertson = (,) "Robertson" $ OdeProblem
   , odeMaxEvents = 0
   , odeSolTimes = [0,5]
   , odeTolerances = defaultTolerances -- FIXME how to make this integrate indefinitely, as in the sundials example?
+  }
+
+empty = (,) "Empty system" $ OdeProblem
+  { odeRhs = OdeRhsHaskell $ \_ _ -> []
+  , odeJacobian = Nothing
+  , odeInitCond = []
+  , odeEvents = []
+  , odeMaxEvents = 0
+  , odeSolTimes = [0,1]
+  , odeTolerances = defaultTolerances
   }
 
 largeTs :: V.Vector Double
