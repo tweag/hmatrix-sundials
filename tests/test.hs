@@ -36,7 +36,7 @@ main = do
     initLogEnv "test" "devel"
   let ?log_env = log_env
 
-  defaultMain $ testGroup "Tests"
+  defaultMain $ testGroup "Tests" $
     [
       testGroup solver_name
       [ testGroup (show method) $
@@ -49,7 +49,21 @@ main = do
       ]
     | (solver, solver_name) <-
       [ (solveCV, "CVode") ]
+    ] ++
+    [ testGroup "Method comparison"
+      [ testGroup (show method1 ++ " vs " ++ show method2) $ compareMethodsTests
+          (defaultOpts method1, solver1)
+          (defaultOpts method2, solver2)
+      | (method1, solver1) <- availableMethods
+      , (method2, solver2) <- availableMethods
+      , method1 /= method2
+      ]
     ]
+
+availableMethods =
+  [ (CV.BDF, solveCV)
+  , (CV.ADAMS, solveCV)
+  ]
 
 noErrorTests opts solver = testGroup "Absence of error"
   [ testCase name $ do
@@ -67,6 +81,17 @@ withVsWithoutJacobian opts solver = testGroup "With vs without jacobian"
       assertBool "Difference too large" $ norm_2 (solJac - solNoJac) < 1e-3
   | (name, prob) <- [ brusselator, robertson ]
   ]
+
+compareMethodsTests (opts1, solver1) (opts2, solver2) =
+  [ testCase name $ do
+      Right (solutionMatrix -> sol1) <- runKatipT ?log_env $ solver1 opts1 prob
+      Right (solutionMatrix -> sol2) <- runKatipT ?log_env $ solver2 opts2 prob
+      let diff = maximum $ map abs $
+                 zipWith (-) ((toLists $ tr sol1)!!0) ((toLists $ tr sol2)!!0)
+      assertBool "Difference too large" $ diff < 1e-6
+  | (name, prob) <- [ stiffish ]
+  ]
+  
 
 eventTests opts solver = testGroup "Events"
   [ testCase "Exponential" $ do
@@ -202,6 +227,18 @@ empty = (,) "Empty system" $ OdeProblem
   , odeSolTimes = [0,1]
   , odeTolerances = defaultTolerances
   }
+
+stiffish = (,) "Stiffish" $ OdeProblem
+  { odeRhs = OdeRhsHaskell $ \t ((V.! 0) -> u) -> [ lamda * u + 1.0 / (1.0 + t * t) - lamda * atan t ]
+  , odeJacobian = Nothing
+  , odeInitCond = [0.0]
+  , odeEvents = []
+  , odeMaxEvents = 0
+  , odeSolTimes = [0.0, 0.1 .. 10.0]
+  , odeTolerances = defaultTolerances
+  }
+  where
+    lamda = -100.0
 
 largeTs :: V.Vector Double
 largeTs = V.fromList $ 0.0 : take 12 (iterate (*10) 0.04)
