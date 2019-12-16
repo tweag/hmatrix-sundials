@@ -1,13 +1,18 @@
 -- | Common infrastructure for CVode/ARKode
-{-# LANGUAGE RecordWildCards #-}
 module Numeric.Sundials.Common where
 
 import Foreign.C.Types
+import Foreign.Ptr
+import Foreign.Storable (peek, poke)
 import Numeric.Sundials.Types
+import qualified Numeric.Sundials.Foreign as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
+import Numeric.LinearAlgebra.HMatrix hiding (Vector)
 import GHC.Prim
+import Control.Monad.IO.Class
+import Katip
 
 -- | A collection of variables that we allocate on the Haskell side and
 -- pass into the C code to be filled.
@@ -71,3 +76,41 @@ freezeCVars CVars{..} = do
   c_var_weight <- V.unsafeFreeze c_var_weight
   c_local_error_set <- V.unsafeFreeze c_local_error_set
   return CVars {..}
+
+-- | The common solving logic between ARKode and CVode
+solveCommon
+  :: Katip m
+  => ODEOpts method
+  -> OdeProblem
+  -> m (Either ErrorDiagnostics SundialsSolution)
+solveCommon ODEOpts{..} OdeProblem{..}
+
+  | VS.null odeInitCond = -- 0-dimensional (empty) system
+    return . Right $ SundialsSolution
+      { actualTimeGrid = odeSolTimes
+      , solutionMatrix = (VS.length odeSolTimes >< 0) []
+      , eventInfo = []
+      , diagnostics = emptyDiagnostics
+      }
+
+  | otherwise = do
+  report_error <- logWithKatip
+  liftIO $ do -- the rest is in the IO monad
+  (rhs_funptr :: FunPtr OdeRhsCType, userdata :: Ptr UserData) <-
+    case odeRhs of
+      OdeRhsC ptr u -> return (ptr, u)
+      OdeRhsHaskell fun -> do
+        let
+          funIO :: CDouble -> Ptr T.SunVector -> Ptr T.SunVector -> Ptr UserData -> IO CInt
+          funIO t y f _ptr = do
+            sv <- peek y
+            poke f $ SunVector { sunVecN = sunVecN sv
+                               , sunVecVals = fun t (sunVecVals sv)
+                               }
+            return 0
+        funptr <- mkOdeRhsC funIO
+        return (funptr, nullPtr)
+  _
+
+foreign import ccall "wrapper"
+  mkOdeRhsC :: OdeRhsCType -> IO (FunPtr OdeRhsCType)
