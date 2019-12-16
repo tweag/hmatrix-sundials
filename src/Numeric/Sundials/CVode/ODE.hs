@@ -42,10 +42,10 @@ import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, rows,
                                                 cols, toLists, size, reshape,
                                                 subVector, toColumns, fromColumns, asColumn)
 
-import           Numeric.Sundials.Arkode (cV_ADAMS, cV_BDF,
+import           Numeric.Sundials.Foreign (cV_ADAMS, cV_BDF,
                                           vectorToC, cV_SUCCESS,
                                           SunVector(..), SunIndexType)
-import qualified Numeric.Sundials.Arkode as T
+import qualified Numeric.Sundials.Foreign as T
 import           Numeric.Sundials.Types
 
 import Control.Monad.IO.Class
@@ -67,7 +67,7 @@ C.include "<cvode/cvode_direct.h>"        -- access to CVDls interface
 C.include "<sundials/sundials_types.h>"   -- definition of type realtype
 C.include "<sundials/sundials_math.h>"
 C.include "../../../helpers.h"
-C.include "Numeric/Sundials/Arkode_hsc.h"
+C.include "Numeric/Sundials/Foreign_hsc.h"
 
 -- | Stepping functions
 data ODEMethod = ADAMS

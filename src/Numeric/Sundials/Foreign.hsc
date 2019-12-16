@@ -3,44 +3,45 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE EmptyDataDecls #-}
 
-module Numeric.Sundials.Arkode ( getDataFromContents
-                               , putDataInContents
-                               , cV_ADAMS
-                               , cV_BDF
-                               , vectorToC
-                               , cV_SUCCESS
-                               , cV_ROOT_RETURN
-                               , SunIndexType
-                               , SunRealType
-                               , SunMatrix(..)
-                               , SunVector(..)
-                               , sunContentLengthOffset
-                               , sunContentDataOffset
-                               , hEUN_EULER_2_1_2
-                               , bOGACKI_SHAMPINE_4_2_3
-                               , aRK324L2SA_ERK_4_2_3
-                               , zONNEVELD_5_3_4
-                               , aRK436L2SA_ERK_6_3_4
-                               , sAYFY_ABURUB_6_3_4
-                               , cASH_KARP_6_4_5
-                               , fEHLBERG_6_4_5
-                               , dORMAND_PRINCE_7_4_5
-                               , aRK548L2SA_ERK_8_4_5
-                               , vERNER_8_5_6
-                               , fEHLBERG_13_7_8
-                               , sDIRK_2_1_2
-                               , bILLINGTON_3_3_2
-                               , tRBDF2_3_3_2
-                               , kVAERNO_4_2_3
-                               , aRK324L2SA_DIRK_4_2_3
-                               , cASH_5_2_4
-                               , cASH_5_3_4
-                               , sDIRK_5_3_4
-                               , kVAERNO_5_3_4
-                               , aRK436L2SA_DIRK_6_3_4
-                               , kVAERNO_7_4_5
-                               , aRK548L2SA_DIRK_8_4_5
-                               ) where
+module Numeric.Sundials.Foreign
+  ( getDataFromContents
+  , putDataInContents
+  , cV_ADAMS
+  , cV_BDF
+  , vectorToC
+  , cV_SUCCESS
+  , cV_ROOT_RETURN
+  , SunIndexType
+  , SunRealType
+  , SunMatrix(..)
+  , SunVector(..)
+  , sunContentLengthOffset
+  , sunContentDataOffset
+  , hEUN_EULER_2_1_2
+  , bOGACKI_SHAMPINE_4_2_3
+  , aRK324L2SA_ERK_4_2_3
+  , zONNEVELD_5_3_4
+  , aRK436L2SA_ERK_6_3_4
+  , sAYFY_ABURUB_6_3_4
+  , cASH_KARP_6_4_5
+  , fEHLBERG_6_4_5
+  , dORMAND_PRINCE_7_4_5
+  , aRK548L2SA_ERK_8_4_5
+  , vERNER_8_5_6
+  , fEHLBERG_13_7_8
+  , sDIRK_2_1_2
+  , bILLINGTON_3_3_2
+  , tRBDF2_3_3_2
+  , kVAERNO_4_2_3
+  , aRK324L2SA_DIRK_4_2_3
+  , cASH_5_2_4
+  , cASH_5_3_4
+  , sDIRK_5_3_4
+  , kVAERNO_5_3_4
+  , aRK436L2SA_DIRK_6_3_4
+  , kVAERNO_7_4_5
+  , aRK548L2SA_DIRK_8_4_5
+  ) where
 
 import           Foreign
 import           Foreign.C.Types

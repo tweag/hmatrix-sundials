@@ -32,10 +32,10 @@ library
                        sundials_cvode
   other-extensions:    QuasiQuotes
   hs-source-dirs:      src
-  exposed-modules:     Numeric.Sundials.Types,
-                       Numeric.Sundials.ARKode.ODE,
+  exposed-modules:     Numeric.Sundials.Types
+                       Numeric.Sundials.ARKode.ODE
                        Numeric.Sundials.CVode.ODE
-  other-modules:       Numeric.Sundials.Arkode
+  other-modules:       Numeric.Sundials.Foreign
   c-sources:           src/helpers.c
   default-language:    Haskell2010
   default-extensions:  NondecreasingIndentation

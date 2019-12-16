@@ -36,7 +36,7 @@ import           Foreign.C.Types
 import           Foreign.Ptr
 import           Language.C.Types as CT
 import           Language.C.Inline.Context
-import           Numeric.Sundials.Arkode (SunVector(..), SunMatrix(..),
+import           Numeric.Sundials.Foreign (SunVector(..), SunMatrix(..),
                                           SunIndexType, SunRealType,
                                           sunContentLengthOffset,
                                           sunContentDataOffset)

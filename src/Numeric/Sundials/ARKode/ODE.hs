@@ -44,8 +44,8 @@ import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, rows,
                                                 (><))
 
 import           Numeric.Sundials.Types
-import qualified Numeric.Sundials.Arkode as T
-import           Numeric.Sundials.Arkode (sDIRK_2_1_2,
+import qualified Numeric.Sundials.Foreign as T
+import           Numeric.Sundials.Foreign (sDIRK_2_1_2,
                                           bILLINGTON_3_3_2,
                                           tRBDF2_3_3_2,
                                           kVAERNO_4_2_3,
@@ -87,7 +87,7 @@ C.include "<sunmatrix/sunmatrix_dense.h>"
 C.include "<sunlinsol/sunlinsol_dense.h>"
 C.include "<sundials/sundials_types.h>"
 C.include "<sundials/sundials_math.h>"
-C.include "Numeric/Sundials/Arkode_hsc.h"
+C.include "Numeric/Sundials/Foreign_hsc.h"
 C.include "../../../helpers.h"
 
 
