@@ -38,9 +38,9 @@ import           Data.Coerce (coerce)
 
 import           Numeric.LinearAlgebra.Devel (createVector)
 
-import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, toList, rows,
+import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, rows,
                                                 cols, toLists, size, reshape,
-                                                subVector, subMatrix, toColumns, fromColumns, asColumn)
+                                                subVector, toColumns, fromColumns, asColumn)
 
 import           Numeric.Sundials.Arkode (cV_ADAMS, cV_BDF,
                                           vectorToC, cV_SUCCESS,
@@ -96,108 +96,6 @@ directionToInt d =
 getMethod :: ODEMethod -> Int
 getMethod (ADAMS) = cV_ADAMS
 getMethod (BDF)   = cV_BDF
-
-getJacobian :: ODEMethod -> Maybe Jacobian
-getJacobian _ = Nothing
-
--- | A version of 'odeSolveVWith' with reasonable default step control.
-odeSolveV
-    :: (Katip m, MonadIO m)
-    => ODEMethod
-    -> Maybe Double      -- ^ initial step size - by default, CVode
-                         -- estimates the initial step size to be the
-                         -- solution \(h\) of the equation
-                         -- \(\|\frac{h^2\ddot{y}}{2}\| = 1\), where
-                         -- \(\ddot{y}\) is an estimated value of the
-                         -- second derivative of the solution at \(t_0\)
-    -> Double            -- ^ absolute tolerance for the state vector
-    -> Double            -- ^ relative tolerance for the state vector
-    -> (Double -> Vector Double -> Vector Double) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
-    -> Vector Double     -- ^ initial conditions
-    -> Vector Double     -- ^ desired solution times
-    -> m (Matrix Double) -- ^ solution
-odeSolveV meth hi epsAbs epsRel f y0 ts =
-  odeSolveVWith meth (X epsAbs epsRel) hi g y0 ts
-  where
-    g t x0 = coerce $ f t x0
-
--- | A version of 'odeSolveV' with reasonable default parameters and
--- system of equations defined using lists. FIXME: we should say
--- something about the fact we could use the Jacobian but don't for
--- compatibility with hmatrix-gsl.
-odeSolve :: (MonadIO m, Katip m)
-         => (Double -> [Double] -> [Double]) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
-         -> [Double]                         -- ^ initial conditions
-         -> Vector Double                    -- ^ desired solution times
-         -> m (Matrix Double)                -- ^ solution
-odeSolve f y0 ts =
-  -- FIXME: These tolerances are different from the ones in GSL
-  odeSolveVWith BDF (XX' 1.0e-6 1.0e-10 1 1)  Nothing g (V.fromList y0) (V.fromList $ toList ts)
-  where
-    g t x0 = V.fromList $ f t (V.toList x0)
-
--- | A version of 'odeSolveVWith'' with reasonable default solver
--- options.
-odeSolveVWith
-  :: (Katip m, MonadIO m)
-  => ODEMethod
-  -> StepControl
-  -> Maybe Double -- ^ initial step size - by default, CVode
-                  -- estimates the initial step size to be the
-                  -- solution \(h\) of the equation
-                  -- \(\|\frac{h^2\ddot{y}}{2}\| = 1\), where
-                  -- \(\ddot{y}\) is an estimated value of the second
-                  -- derivative of the solution at \(t_0\)
-  -> (Double -> V.Vector Double -> V.Vector Double) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
-  -> V.Vector Double                     -- ^ Initial conditions
-  -> V.Vector Double                     -- ^ Desired solution times
-  -> m (Matrix Double)                       -- ^ Error code or solution
-odeSolveVWith method control initStepSize f y0 tt = do
-  r <- odeSolveVWith' opts f y0 tt
-  case r of
-    Left  (c, _v) -> error $ show c -- FIXME
-    Right (v, _d) -> return v
-  where
-    opts = ODEOpts { maxNumSteps = 10000
-                   , minStep     = 1.0e-12
-                   , maxFail     = 10
-                   , odeMethod   = method
-                   , stepControl = control
-                   , initStep    = initStepSize
-                   }
-
-odeSolveVWith'
-  :: (Katip m, MonadIO m)
-  => ODEOpts ODEMethod
-  -> (Double -> V.Vector Double -> V.Vector Double) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
-  -> V.Vector Double                     -- ^ Initial conditions
-  -> V.Vector Double                     -- ^ Desired solution times
-  -> m (Either (Matrix Double, Int) (Matrix Double, SundialsDiagnostics)) -- ^ Error code or solution
-odeSolveVWith' opts f y0 tt = do
-  r <- solveOdeC (fromIntegral $ maxFail opts)
-                  (fromIntegral $ maxNumSteps opts) (coerce $ minStep opts)
-                  (fromIntegral . getMethod . odeMethod $ opts) (coerce $ initStep opts) jacH (scise $ stepControl opts)
-                  (OdeRhsHaskell $ coerce f) (coerce y0)
-                  0 (\_ x -> x) mempty mempty 0 (\_ _ y -> y) (coerce tt)
-  return $ case r of
-    -- Remove the time column for backwards compatibility
-    SolverError (ErrorDiagnostics {errorCode, partialResults}) -> Left
-                               ( subMatrix (0, 1) (V.length tt, l) partialResults
-                               , fromIntegral errorCode
-                               )
-    SolverSuccess _ m d     -> Right
-                               ( subMatrix (0, 1) (V.length tt, l) m
-                               , d
-                               )
-  where
-    l = size y0
-    scise (X aTol rTol)                          = coerce (V.replicate l aTol, rTol)
-    scise (X' aTol rTol)                         = coerce (V.replicate l aTol, rTol)
-    scise (XX' aTol rTol yScale _yDotScale)      = coerce (V.replicate l aTol, yScale * rTol)
-    -- FIXME; Should we check that the length of ss is correct?
-    scise (ScXX' aTol rTol yScale _yDotScale ss) = coerce (V.map (* aTol) ss, yScale * rTol)
-    jacH = fmap (\g t v -> matrixToSunMatrix $ g (coerce t) (coerce v)) $
-           getJacobian $ odeMethod opts
 
 matrixToSunMatrix :: Matrix Double -> T.SunMatrix
 matrixToSunMatrix m = T.SunMatrix { T.rows = nr, T.cols = nc, T.vals = vs }

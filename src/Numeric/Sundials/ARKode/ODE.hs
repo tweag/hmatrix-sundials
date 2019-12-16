@@ -39,7 +39,7 @@ import           GHC.Generics (C1, Constructor, (:+:)(..), D1, Rep, Generic, M1(
 
 import           Numeric.LinearAlgebra.Devel (createVector)
 
-import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, toList, rows,
+import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, rows,
                                                 cols, toLists, size, reshape,
                                                 (><))
 
@@ -238,70 +238,6 @@ getJacobian (ARK548L2SA_ERK_8_4_5 j)   = Just j
 getJacobian (VERNER_8_5_6 j)           = Just j
 getJacobian (FEHLBERG_13_7_8 j)        = Just j
 getJacobian _                          = Nothing
-
--- | A version of 'odeSolveVWith' with reasonable default step control.
-odeSolveV
-    :: (MonadIO m, Katip m)
-    => ODEMethod
-    -> Maybe Double      -- ^ initial step size - by default, ARKode
-                         -- estimates the initial step size to be the
-                         -- solution \(h\) of the equation
-                         -- \(\|\frac{h^2\ddot{y}}{2}\| = 1\), where
-                         -- \(\ddot{y}\) is an estimated value of the
-                         -- second derivative of the solution at \(t_0\)
-    -> Double            -- ^ absolute tolerance for the state vector
-    -> Double            -- ^ relative tolerance for the state vector
-    -> (Double -> Vector Double -> Vector Double) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
-    -> Vector Double     -- ^ initial conditions
-    -> Vector Double     -- ^ desired solution times
-    -> m (Matrix Double) -- ^ solution
-odeSolveV meth hi epsAbs epsRel f y0 ts =
-  odeSolveVWith meth (X epsAbs epsRel) hi g y0 ts
-    where
-      g t x0 = coerce $ f t x0
-
--- | A version of 'odeSolveV' with reasonable default parameters and
--- system of equations defined using lists. FIXME: we should say
--- something about the fact we could use the Jacobian but don't for
--- compatibility with hmatrix-gsl.
-odeSolve :: (MonadIO m, Katip m)
-         => (Double -> [Double] -> [Double]) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
-         -> [Double]                         -- ^ initial conditions
-         -> Vector Double                    -- ^ desired solution times
-         -> m (Matrix Double)                -- ^ solution
-odeSolve f y0 ts =
-  -- FIXME: These tolerances are different from the ones in GSL
-  odeSolveVWith SDIRK_5_3_4' (XX' 1.0e-6 1.0e-10 1 1)  Nothing g (V.fromList y0) (V.fromList $ toList ts)
-  where
-    g t x0 = V.fromList $ f t (V.toList x0)
-
-odeSolveVWith
-  :: (MonadIO m, Katip m)
-  => ODEMethod
-  -> StepControl
-  -> Maybe Double -- ^ initial step size - by default, ARKode
-                  -- estimates the initial step size to be the
-                  -- solution \(h\) of the equation
-                  -- \(\|\frac{h^2\ddot{y}}{2}\| = 1\), where
-                  -- \(\ddot{y}\) is an estimated value of the second
-                  -- derivative of the solution at \(t_0\)
-  -> (Double -> V.Vector Double -> V.Vector Double) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
-  -> V.Vector Double                     -- ^ Initial conditions
-  -> V.Vector Double                     -- ^ Desired solution times
-  -> m (Matrix Double)                   -- ^ Error code or solution
-odeSolveVWith method control initStepSize f y0 tt = do
-  r <- odeSolveVWith' opts method control initStepSize f y0 tt
-  case r of
-    Left  (c, _v) -> error $ show c -- FIXME
-    Right (v, _d) -> return v
-  where
-    opts = ODEOpts { maxNumSteps = 10000
-                   , minStep     = 1.0e-12
-                   , maxFail     = 10
-                   , odeMethod   = error "ARKode: unexpected use of ODEOpts.odeMethod"
-                   , stepControl = error "ARKode: unexpected use of ODEOpts.stepControl"
-                   , initStep    = error "ARKode: unexpected use of ODEOpts.initStep"
-                   }
 
 odeSolveVWith' :: (MonadIO m, Katip m)
   => ODEOpts ODEMethod
