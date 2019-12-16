@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass, DeriveGeneric, TemplateHaskell, OverloadedStrings #-}
 module Numeric.Sundials.Types
-  ( OdeRhsCType
+  ( OdeProblem(..)
+  , OdeRhsCType
   , OdeRhs(..)
   , UserData
   , Jacobian
@@ -48,6 +49,16 @@ import Foreign.C.String
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as BS
 import Control.Monad.Reader
+
+data OdeProblem = OdeProblem
+  { odeEvents :: [EventSpec]
+  , odeMaxEvents :: !Int
+  , odeRhs :: OdeRhs
+  , odeJacobian :: Maybe (Double -> Vector Double -> Matrix Double)
+  , odeInitCond :: VS.Vector Double
+  , odeSolTimes :: VS.Vector Double
+  , odeTolerances :: StepControl
+  }
 
 -- | The type of the C ODE RHS function.
 type OdeRhsCType = CDouble -> Ptr SunVector -> Ptr SunVector -> Ptr UserData -> IO CInt

@@ -4,6 +4,7 @@
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Numeric.Sundials.Types
 import qualified Numeric.Sundials.ARKode.ODE as ARK
 import qualified Numeric.Sundials.CVode.ODE  as CV
 import Numeric.Sundials.Types
@@ -21,16 +22,6 @@ import Data.Coerce
 ----------------------------------------------------------------------
 --                            Helpers
 ----------------------------------------------------------------------
-
-data OdeProblem = OdeProblem
-  { odeEvents :: [EventSpec]
-  , odeMaxEvents :: !Int
-  , odeRhs :: OdeRhs
-  , odeJacobian :: Maybe (Double -> Vector Double -> Matrix Double)
-  , odeInitCond :: V.Vector Double
-  , odeSolTimes :: V.Vector Double
-  , odeTolerances :: StepControl
-  }
 
 data OdeSolver = forall method . Show method => OdeSolver
   String -- name
