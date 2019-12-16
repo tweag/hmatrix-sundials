@@ -13,6 +13,11 @@ import Foreign.C.Types
 import System.IO
 import Text.Printf (printf)
 import GHC.Stack
+import Control.Monad
+
+----------------------------------------------------------------------
+--                            Helpers
+----------------------------------------------------------------------
 
 data OdeProblem = OdeProblem
   { odeEvents :: [EventSpec]
@@ -66,6 +71,28 @@ availableMethods =
   [ (CV.BDF, solveCV)
   , (CV.ADAMS, solveCV)
   ]
+
+defaultOpts :: method -> ODEOpts method
+defaultOpts method = ODEOpts
+  { maxNumSteps = 10000
+  , minStep     = 1.0e-12
+  , maxFail     = 10
+  , odeMethod   = method
+  , stepControl = defaultTolerances
+  , initStep    = Nothing
+  }
+
+defaultTolerances = CV.XX' 1.0e-6 1.0e-10 1 1
+
+checkDiscrepancy :: HasCallStack => Double -> Double -> Assertion
+checkDiscrepancy eps diff = assertBool msg $ diff <= eps
+  where
+    msg = printf "Difference too large: %.2e > %.2e"
+      diff eps
+
+----------------------------------------------------------------------
+--                             The tests
+----------------------------------------------------------------------
 
 noErrorTests opts solver = testGroup "Absence of error"
   [ testCase name $ do
@@ -122,6 +149,13 @@ eventTests opts solver = testGroup "Events"
           , odeSolTimes = [0,100]
           }
       length events @?= 100
+  , testCase "Bounded sine" $ do
+      Right (eventInfo -> events) <- runKatipT ?log_env $ solver opts boundedSine
+      length events @?= 3
+      map rootDirection events @?= [Upwards, Downwards, Upwards]
+      map eventIndex events @?= [0, 1, 0]
+      forM_ (zip (map eventTime events) [1.119766,3.359295,5.598820]) $ \(et_got, et_exp) ->
+        checkDiscrepancy 1e-4 (abs (et_exp - et_got))
   ]
 
 {-
@@ -133,24 +167,6 @@ solveARK
 solveARK opts OdeProblem{..} =
   ARK.odeSolveWithEvents opts odeEvents odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
 -}
-
-defaultOpts :: method -> ODEOpts method
-defaultOpts method = ODEOpts
-  { maxNumSteps = 10000
-  , minStep     = 1.0e-12
-  , maxFail     = 10
-  , odeMethod   = method
-  , stepControl = defaultTolerances
-  , initStep    = Nothing
-  }
-
-defaultTolerances = CV.XX' 1.0e-6 1.0e-10 1 1
-
-checkDiscrepancy :: HasCallStack => Double -> Double -> Assertion
-checkDiscrepancy eps diff = assertBool msg $ diff <= eps
-  where
-    msg = printf "Difference too large: %.2e > %.2e"
-      diff eps
 
 ----------------------------------------------------------------------
 --                           ODE problems
@@ -247,6 +263,31 @@ stiffish = (,) "Stiffish" $ OdeProblem
   }
   where
     lamda = -100.0
+
+-- A sine wave that only changes direction once it reaches ±0.9.
+-- Illustrates event-specific reset function
+boundedSine = OdeProblem
+  { odeRhs = OdeRhsHaskell $ \_t y -> [y V.! 1, - y V.! 0]
+  , odeJacobian = Nothing
+  , odeInitCond = [0,1]
+  , odeEvents = events
+  , odeMaxEvents = 100
+  , odeSolTimes = V.fromList [ 2 * pi * k / 360 | k <- [0..360]]
+  , odeTolerances = defaultTolerances
+  }
+  where
+    events =
+      [ EventSpec { eventCondition = \_t y -> y ! 0 - 0.9
+                     , eventUpdate = \_ y -> vector [ y ! 0, - abs (y ! 1) ]
+                     , eventDirection = Upwards
+                     , eventStopSolver = False
+                     }
+      , EventSpec { eventCondition = \_t y -> y ! 0 + 0.9
+                     , eventUpdate = \_ y -> vector [ y ! 0, abs (y ! 1) ]
+                     , eventDirection = Downwards
+                     , eventStopSolver = False
+                     }
+      ]
 
 largeTs :: V.Vector Double
 largeTs = V.fromList $ 0.0 : take 12 (iterate (*10) 0.04)
