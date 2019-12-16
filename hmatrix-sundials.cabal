@@ -9,8 +9,7 @@ maintainer:          Roman Cheplyaka
 copyright:           Dominic Steinitz 2018, Novadiscovery 2019
 category:            Math
 build-type:          Simple
-extra-source-files:  ChangeLog.md, README.md, diagrams/*.png
-extra-doc-files:     diagrams/*.png
+extra-source-files:  ChangeLog.md, README.md
 cabal-version:       >=1.18
 
 
@@ -54,30 +53,6 @@ test-suite test
                        katip
   default-language:    Haskell2010
   
-
-test-suite hmatrix-sundials-testsuite
-  type:                exitcode-stdio-1.0
-  main-is:             Main.hs
-  build-depends:       base,
-                       inline-c,
-                       vector,
-                       template-haskell,
-                       containers,
-                       split,
-                       hmatrix,
-                       plots,
-                       diagrams-lib,
-                       diagrams-rasterific,
-                       lens,
-                       hspec,
-                       hmatrix-sundials,
-                       katip
-  hs-source-dirs:      test-hspec
-  extra-libraries:     sundials_arkode,
-                       sundials_cvode
-  c-sources:           src/helpers.c
-  default-language:    Haskell2010
-  default-extensions:  NondecreasingIndentation
 
 benchmark benchmark
   type:
