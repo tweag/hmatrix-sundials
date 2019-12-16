@@ -14,6 +14,8 @@ import System.IO
 import Text.Printf (printf)
 import GHC.Stack
 import Control.Monad
+import Data.Bifunctor
+import Data.Coerce
 
 ----------------------------------------------------------------------
 --                            Helpers
@@ -36,6 +38,18 @@ solveCV
   -> m (Either ErrorDiagnostics SundialsSolution)
 solveCV opts OdeProblem{..} =
   CV.odeSolveWithEvents opts {stepControl = odeTolerances} odeEvents odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
+
+solveARK
+  :: Katip m
+  => ODEOpts ARK.ODEMethod
+  -> OdeProblem
+  -> m (Either ErrorDiagnostics SundialsSolution)
+solveARK opts OdeProblem{..} = do
+  let rhs = case odeRhs of
+        OdeRhsHaskell rhsH -> rhsH
+        OdeRhsC {} -> error "Compiled RHS is not yet supported with ARKode" -- FIXME
+  fmap (first $ \e -> ErrorDiagnostics e mempty mempty mempty) $ -- FIXME
+    ARK.odeSolveWithEvents opts odeEvents odeMaxEvents (coerce rhs) odeJacobian odeInitCond odeSolTimes
 
 main = do
   handleScribe <- mkHandleScribe ColorIfTerminal stderr (permitItem InfoS) V2
@@ -157,16 +171,6 @@ eventTests opts solver = testGroup "Events"
       forM_ (zip (map eventTime events) [1.119766,3.359295,5.598820]) $ \(et_got, et_exp) ->
         checkDiscrepancy 1e-4 (abs (et_exp - et_got))
   ]
-
-{-
-solveARK
-  :: Katip m
-  => ODEOpts CV.ODEMethod
-  -> OdeProblem
-  -> m (Either ErrorDiagnostics SundialsSolution)
-solveARK opts OdeProblem{..} =
-  ARK.odeSolveWithEvents opts odeEvents odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
--}
 
 ----------------------------------------------------------------------
 --                           ODE problems
