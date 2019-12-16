@@ -15,14 +15,11 @@
 -- |
 -- Solution of ordinary differential equation (ODE) initial value problems.
 -- See <https://computation.llnl.gov/projects/sundials/sundials-software> for more detail.
-module Numeric.Sundials.ARKode.ODE ( odeSolve
-                                   , odeSolveV
-                                   , odeSolveVWith
-                                   , odeSolveVWith'
-                                   , odeSolveWithEvents
-                                   , ODEMethod(..)
-                                   , StepControl(..)
-                                   ) where
+module Numeric.Sundials.ARKode.ODE
+  ( odeSolveWithEvents
+  , ODEMethod(..)
+  , StepControl(..)
+  ) where
 
 import qualified Language.C.Inline as C
 import qualified Language.C.Inline.Unsafe as CU

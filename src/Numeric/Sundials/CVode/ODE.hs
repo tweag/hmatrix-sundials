@@ -11,16 +11,12 @@
 -- | Solution of ordinary differential equation (ODE) initial value problems.
 --
 -- <https://computation.llnl.gov/projects/sundials/sundials-software>
-module Numeric.Sundials.CVode.ODE ( odeSolve
-                                   , odeSolveV
-                                   , odeSolveVWith
-                                   , odeSolveVWith'
-                                   , odeSolveRootVWith'
-                                   , odeSolveWithEvents
-                                   , ODEMethod(..)
-                                   , StepControl(..)
-                                   , SolverResult(..)
-                                   ) where
+module Numeric.Sundials.CVode.ODE
+  ( odeSolveWithEvents
+  , ODEMethod(..)
+  , StepControl(..)
+  , SolverResult(..)
+  ) where
 
 import qualified Language.C.Inline as C
 import qualified Language.C.Inline.Unsafe as CU
