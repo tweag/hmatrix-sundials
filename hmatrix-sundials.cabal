@@ -36,6 +36,7 @@ library
                        Numeric.Sundials.ARKode.ODE
                        Numeric.Sundials.CVode.ODE
   other-modules:       Numeric.Sundials.Foreign
+                       Numeric.Sundials.Common
   c-sources:           src/helpers.c
   default-language:    Haskell2010
   default-extensions:  NondecreasingIndentation
