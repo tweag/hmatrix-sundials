@@ -10,6 +10,7 @@ import qualified Numeric.Sundials.CVode.ODE  as CV
 import Numeric.Sundials.Types
 import Numeric.LinearAlgebra as L
 import qualified Data.Vector.Storable as V
+import qualified Data.Vector as VB
 import Katip
 import Foreign.C.Types
 import System.IO
@@ -38,7 +39,7 @@ solveCV
   -> OdeProblem
   -> m (Either ErrorDiagnostics SundialsSolution)
 solveCV opts OdeProblem{..} =
-  CV.odeSolveWithEvents opts {stepControl = odeTolerances} odeEvents odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
+  CV.odeSolveWithEvents opts {stepControl = odeTolerances} (VB.toList odeEvents {-FIXME-}) odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
 
 solveARK
   :: Katip m
@@ -50,7 +51,7 @@ solveARK opts OdeProblem{..} = do
         OdeRhsHaskell rhsH -> rhsH
         OdeRhsC {} -> error "Compiled RHS is not yet supported with ARKode" -- FIXME
   fmap (first $ \e -> ErrorDiagnostics e mempty mempty mempty) $ -- FIXME
-    ARK.odeSolveWithEvents opts odeEvents odeMaxEvents (coerce rhs) odeJacobian odeInitCond odeSolTimes
+    ARK.odeSolveWithEvents opts (VB.toList odeEvents) odeMaxEvents (coerce rhs) odeJacobian odeInitCond odeSolTimes
 
 availableSolvers :: [OdeSolver]
 availableSolvers =

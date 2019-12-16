@@ -26,6 +26,7 @@ module Numeric.Sundials.Types
   where
 
 import           Data.Int (Int32)
+import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Map.Strict as Map
 import qualified Language.Haskell.TH as TH
@@ -51,7 +52,7 @@ import qualified Data.ByteString as BS
 import Control.Monad.Reader
 
 data OdeProblem = OdeProblem
-  { odeEvents :: [EventSpec]
+  { odeEvents :: V.Vector EventSpec
   , odeMaxEvents :: !Int
   , odeRhs :: OdeRhs
   , odeJacobian :: Maybe (Double -> Vector Double -> Matrix Double)
