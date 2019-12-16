@@ -11,6 +11,8 @@ import qualified Data.Vector.Storable as V
 import Katip
 import Foreign.C.Types
 import System.IO
+import Text.Printf (printf)
+import GHC.Stack
 
 data OdeProblem = OdeProblem
   { odeEvents :: [EventSpec]
@@ -78,7 +80,7 @@ withVsWithoutJacobian opts solver = testGroup "With vs without jacobian"
   [ testCase name $ do
       Right (solutionMatrix -> solJac)   <- runKatipT ?log_env $ solver opts prob
       Right (solutionMatrix -> solNoJac) <- runKatipT ?log_env $ solver opts prob { odeJacobian = Nothing }
-      assertBool "Difference too large" $ norm_2 (solJac - solNoJac) < 1e-3
+      checkDiscrepancy 1e-3 $ norm_2 (solJac - solNoJac)
   | (name, prob) <- [ brusselator, robertson ]
   ]
 
@@ -88,7 +90,7 @@ compareMethodsTests (opts1, solver1) (opts2, solver2) =
       Right (solutionMatrix -> sol2) <- runKatipT ?log_env $ solver2 opts2 prob
       let diff = maximum $ map abs $
                  zipWith (-) ((toLists $ tr sol1)!!0) ((toLists $ tr sol2)!!0)
-      assertBool "Difference too large" $ diff < 1e-6
+      checkDiscrepancy 1e-5 diff
   | (name, prob) <- [ stiffish ]
   ]
   
@@ -97,7 +99,7 @@ eventTests opts solver = testGroup "Events"
   [ testCase "Exponential" $ do
       Right (eventInfo -> events) <- runKatipT ?log_env $ solver opts exponential
       length events @?= 1
-      assertBool "Difference too large" (abs (eventTime (events!!0) - log 1.1) < 1e-4)
+      checkDiscrepancy 1e-4 (abs (eventTime (events!!0) - log 1.1))
       rootDirection (events!!0) @?= Upwards
       eventIndex (events!!0) @?= 0
   , testCase "Robertson" $ do
@@ -143,6 +145,12 @@ defaultOpts method = ODEOpts
   }
 
 defaultTolerances = CV.XX' 1.0e-6 1.0e-10 1 1
+
+checkDiscrepancy :: HasCallStack => Double -> Double -> Assertion
+checkDiscrepancy eps diff = assertBool msg $ diff <= eps
+  where
+    msg = printf "Difference too large: %.2e > %.2e"
+      diff eps
 
 ----------------------------------------------------------------------
 --                           ODE problems
