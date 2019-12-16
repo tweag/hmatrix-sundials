@@ -56,3 +56,18 @@ allocateCVars OdeProblem{..} = do
   c_var_weight <- VSM.new $ VS.length odeInitCond
   c_local_error_set <- VSM.new 1
   return CVars {..}
+
+-- NB: the mutable CVars must not be used after this
+freezeCVars :: CVars (V.MVector RealWorld) -> IO (CVars V.Vector)
+freezeCVars CVars{..} = do
+  c_diagnostics <- V.unsafeFreeze c_diagnostics
+  c_root_info <- V.unsafeFreeze c_root_info
+  c_event_index <- V.unsafeFreeze c_event_index
+  c_event_time <- V.unsafeFreeze c_event_time
+  c_actual_event_direction <- V.unsafeFreeze c_actual_event_direction
+  c_n_events <- V.unsafeFreeze c_n_events
+  c_n_rows <- V.unsafeFreeze c_n_rows
+  c_local_error <- V.unsafeFreeze c_local_error
+  c_var_weight <- V.unsafeFreeze c_var_weight
+  c_local_error_set <- V.unsafeFreeze c_local_error_set
+  return CVars {..}
