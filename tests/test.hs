@@ -69,7 +69,10 @@ defaultOpts method = ODEOpts
   , initStep    = Nothing
   }
 
-defaultTolerances = CV.XX' 1.0e-6 1.0e-10 1 1
+defaultTolerances = Tolerances
+  { absTolerances = Left 1.0e-6
+  , relTolerance = 1.0e-10
+  }
 
 checkDiscrepancy :: HasCallStack => Double -> Double -> Assertion
 checkDiscrepancy eps diff = assertBool msg $ diff <= eps

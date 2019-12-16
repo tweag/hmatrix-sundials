@@ -14,7 +14,6 @@
 module Numeric.Sundials.CVode.ODE
   ( odeSolveWithEvents
   , ODEMethod(..)
-  , StepControl(..)
   , SolverResult(..)
   ) where
 
@@ -39,7 +38,7 @@ import           Data.Coerce (coerce)
 import           Numeric.LinearAlgebra.Devel (createVector)
 
 import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, rows,
-                                                cols, toLists, size, reshape,
+                                                cols, toLists, reshape,
                                                 subVector, toColumns, fromColumns, asColumn)
 
 import           Numeric.Sundials.Foreign (cV_ADAMS, cV_BDF,
@@ -116,7 +115,7 @@ solveOdeC
   -> CInt
   -> Maybe CDouble
   -> (Maybe (CDouble -> V.Vector CDouble -> T.SunMatrix))
-  -> (V.Vector CDouble, CDouble)
+  -> Tolerances
   -> OdeRhs -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
   -> V.Vector CDouble -- ^ Initial conditions
   -> CInt -- ^ Number of event equations
@@ -134,7 +133,7 @@ solveOdeC
   -> V.Vector CDouble -- ^ Desired solution times
   -> m SolverResult
 solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
-          jacH (aTols, rTol) rhs f0 nr event_fn directions event_stops_solver max_events apply_event ts
+          jacH (Tolerances rTol aTols0) rhs f0 nr event_fn directions event_stops_solver max_events apply_event ts
   | V.null f0 = -- 0-dimensional (empty) system
     return $ SolverSuccess [] (asColumn (coerce ts)) emptyDiagnostics
   | otherwise = do
@@ -158,6 +157,9 @@ solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
       nEq = fromIntegral dim
       nTs :: CInt
       nTs = fromIntegral $ V.length ts
+      aTols :: V.Vector CDouble
+      aTols = either (V.replicate dim) id aTols0
+
   output_mat_mut :: V.MVector _ CDouble <- V.thaw =<< createVector ((1 + fromIntegral dim) * (fromIntegral (2 * max_events) + fromIntegral nTs))
   -- diagMut is a mutable vector which we write diagnostic data while
   -- solving. Its size corresponds to the number of fields in
@@ -581,7 +583,7 @@ odeSolveRootVWith'
 odeSolveRootVWith' opts rhs mb_jacobian y0 event_specs nRootEvs tt =
   solveOdeC (fromIntegral $ maxFail opts)
                  (fromIntegral $ maxNumSteps opts) (coerce $ minStep opts)
-                 (fromIntegral . getMethod . odeMethod $ opts) (coerce $ initStep opts) jacH (scise $ stepControl opts)
+                 (fromIntegral . getMethod . odeMethod $ opts) (coerce $ initStep opts) jacH (stepControl opts)
                  rhs (coerce y0)
                  (genericLength event_specs)
                  event_equations
@@ -590,12 +592,6 @@ odeSolveRootVWith' opts rhs mb_jacobian y0 event_specs nRootEvs tt =
                  (fromIntegral nRootEvs) update_state
                  (coerce tt)
   where
-    l = size y0
-    scise (X aTol rTol)                          = coerce (V.replicate l aTol, rTol)
-    scise (X' aTol rTol)                         = coerce (V.replicate l aTol, rTol)
-    scise (XX' aTol rTol yScale _yDotScale)      = coerce (V.replicate l aTol, yScale * rTol)
-    -- FIXME; Should we check that the length of ss is correct?
-    scise (ScXX' aTol rTol yScale _yDotScale ss) = coerce (V.map (* aTol) ss, yScale * rTol)
     jacH = fmap (\g t v -> matrixToSunMatrix $ g (coerce t) (coerce v)) $ mb_jacobian
     event_vec :: VB.Vector EventSpec
     event_vec = VB.fromList event_specs

@@ -18,7 +18,6 @@
 module Numeric.Sundials.ARKode.ODE
   ( odeSolveWithEvents
   , ODEMethod(..)
-  , StepControl(..)
   ) where
 
 import qualified Language.C.Inline as C
@@ -242,7 +241,7 @@ getJacobian _                          = Nothing
 odeSolveVWith' :: (MonadIO m, Katip m)
   => ODEOpts ODEMethod
   -> ODEMethod
-  -> StepControl
+  -> Tolerances
   -> Maybe Double -- ^ initial step size - by default, ARKode
                   -- estimates the initial step size to be the
                   -- solution \(h\) of the equation
@@ -256,7 +255,7 @@ odeSolveVWith' :: (MonadIO m, Katip m)
 odeSolveVWith' opts method control initStepSize f y0 tt = do
   r <- solveOdeC (fromIntegral $ maxFail opts)
                  (fromIntegral $ maxNumSteps opts) (coerce $ minStep opts)
-                 (fromIntegral $ getMethod method) (coerce initStepSize) jacH (scise control)
+                 (fromIntegral $ getMethod method) (coerce initStepSize) jacH control
                  (coerce f) (coerce y0) (coerce tt)
   return $ case r of
     Left  (v, c) -> Left  (reshape l (coerce v), fromIntegral c)
@@ -265,11 +264,6 @@ odeSolveVWith' opts method control initStepSize f y0 tt = do
       | otherwise -> Right (reshape l (coerce v), d)
   where
     l = size y0
-    scise (X aTol rTol)                          = coerce (V.replicate l aTol, rTol)
-    scise (X' aTol rTol)                         = coerce (V.replicate l aTol, rTol)
-    scise (XX' aTol rTol yScale _yDotScale)      = coerce (V.replicate l aTol, yScale * rTol)
-    -- FIXME; Should we check that the length of ss is correct?
-    scise (ScXX' aTol rTol yScale _yDotScale ss) = coerce (V.map (* aTol) ss, yScale * rTol)
     jacH = fmap (\g t v -> matrixToSunMatrix $ g (coerce t) (coerce v)) $
            getJacobian method
     matrixToSunMatrix m = T.SunMatrix { T.rows = nr, T.cols = nc, T.vals = vs }
@@ -338,14 +332,14 @@ solveOdeC :: (MonadIO m, Katip m) =>
   CInt ->
   Maybe CDouble ->
   (Maybe (CDouble -> V.Vector CDouble -> T.SunMatrix)) ->
-  (V.Vector CDouble, CDouble) ->
+  Tolerances ->
   (CDouble -> V.Vector CDouble -> V.Vector CDouble) -- ^ The RHS of the system \(\dot{y} = f(t,y)\)
   -> V.Vector CDouble -- ^ Initial conditions
   -> V.Vector CDouble -- ^ Desired solution times
   -> m (Either (V.Vector CDouble, CInt) (V.Vector CDouble, SundialsDiagnostics)) -- ^ Partial solution and error code or
                                                                              -- solution and diagnostics
 solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
-          jacH (aTols, rTol) fun f0 ts
+          jacH (Tolerances rTol aTols0) fun f0 ts
   | V.null f0 = -- 0-dimensional (empty) system
     return $ Right (V.empty, emptyDiagnostics)
   | otherwise = do
@@ -366,6 +360,8 @@ solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
       nEq = fromIntegral dim
       nTs :: CInt
       nTs = fromIntegral $ V.length ts
+      aTols :: V.Vector CDouble
+      aTols = either (V.replicate dim) id aTols0
   quasiMatrixRes <- createVector ((fromIntegral dim) * (fromIntegral nTs))
   qMatMut <- V.thaw quasiMatrixRes
   diagn :: V.Vector T.SunIndexType <- createVector 10 -- FIXME
