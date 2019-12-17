@@ -19,7 +19,7 @@ import Language.Haskell.TH
 -- | A collection of variables that we allocate on the Haskell side and
 -- pass into the C code to be filled.
 data CVars vec = CVars
-  { c_diagnostics :: vec CInt
+  { c_diagnostics :: vec SunIndexType
     -- ^ Mutable vector to which we write diagnostic data while
     -- solving. Its size corresponds to the number of fields in
     -- 'SundialsDiagnostics'.
@@ -36,6 +36,9 @@ data CVars vec = CVars
     -- ^ Vector of size 1 that gives the total number of events occurred.
   , c_n_rows :: vec CInt
     -- ^ The total number of rows in the output matrix.
+  , c_output_mat :: vec CDouble
+    -- ^ The output matrix stored in the row-major order.
+    -- Dimensions: (1 + dim) * (2 * max_events + nTs).
   , c_actual_event_direction :: vec CInt
     -- ^ Vector of size max_num_events that gives the direction of the
     -- occurred event.
@@ -74,10 +77,40 @@ freezeCVars CVars{..} = do
   c_actual_event_direction <- V.unsafeFreeze c_actual_event_direction
   c_n_events <- V.unsafeFreeze c_n_events
   c_n_rows <- V.unsafeFreeze c_n_rows
+  c_output_mat <- V.unsafeFreeze c_output_mat
   c_local_error <- V.unsafeFreeze c_local_error
   c_var_weight <- V.unsafeFreeze c_var_weight
   c_local_error_set <- V.unsafeFreeze c_local_error_set
   return CVars {..}
+
+-- | Similar to 'CVars', except these are immutable values that are
+-- accessed (read-only) by the C code and specify the system to be solved.
+data CConsts = CConsts
+  { c_dim :: SunIndexType -- ^ the dimensionality (number of variables/equations)
+  , c_method :: CInt -- ^ the ODE method (specific to the solver)
+  , c_n_sol_times :: CInt
+  , c_sol_time :: VS.Vector CDouble
+  , c_init_cond :: VS.Vector CDouble
+  , c_rhs :: FunPtr OdeRhsCType
+  , c_rhs_userdata :: Ptr UserData
+  , c_rtol :: CDouble
+  , c_atol :: VS.Vector CDouble
+  , c_n_event_specs :: CInt
+  , c_event_fn :: CDouble -> Ptr T.SunVector -> Ptr CDouble -> Ptr () -> IO CInt
+  , c_apply_event :: CInt -> CDouble -> Ptr T.SunVector -> Ptr T.SunVector -> IO CInt
+  , c_jac_set :: CInt
+  , c_jac :: CDouble -> Ptr T.SunVector -> Ptr T.SunVector -> Ptr T.SunMatrix
+          -> Ptr () -> Ptr T.SunVector -> Ptr T.SunVector -> Ptr T.SunVector
+          -> IO CInt
+  , c_requested_event_direction :: VS.Vector CInt
+  , c_event_stops_solver :: VS.Vector CInt
+  , c_max_events :: CInt
+  , c_minstep :: CDouble
+  , c_max_n_steps :: SunIndexType
+  , c_max_err_test_fails :: CInt
+  , c_init_step_size_set :: CInt
+  , c_init_step_size :: CDouble
+  }
 
 -- | The common solving logic between ARKode and CVode
 solveCommon

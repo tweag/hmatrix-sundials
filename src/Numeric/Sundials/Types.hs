@@ -21,6 +21,7 @@ module Numeric.Sundials.Types
   , sunContentDataOffset
   , sunCtx
   , SundialsErrorContext(..)
+  , ReportErrorFn
   , logWithKatip
   )
   where
@@ -184,16 +185,18 @@ instance ToObject SundialsErrorContext
 instance LogItem SundialsErrorContext where
   payloadKeys _ _ = AllKeys
 
+type ReportErrorFn = 
+  (  CInt    -- error code
+  -> CString -- module name
+  -> CString -- function name
+  -> CString -- the message
+  -> Ptr ()  -- user data (ignored)
+  -> IO ()
+  )
+
 logWithKatip
   :: Katip m
-  => m
-    (  CInt    -- error code
-    -> CString -- module name
-    -> CString -- function name
-    -> CString -- the message
-    -> Ptr ()  -- user data (ignored)
-    -> IO ()
-    )
+  => m ReportErrorFn
 logWithKatip = do
   log_env <- getLogEnv
   return $
