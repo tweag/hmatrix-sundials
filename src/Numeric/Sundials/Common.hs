@@ -1,4 +1,5 @@
 -- | Common infrastructure for CVode/ARKode
+{-# LANGUAGE TemplateHaskell #-}
 module Numeric.Sundials.Common where
 
 import Foreign.C.Types
@@ -13,6 +14,7 @@ import Numeric.LinearAlgebra.HMatrix hiding (Vector)
 import GHC.Prim
 import Control.Monad.IO.Class
 import Katip
+import Language.Haskell.TH
 
 -- | A collection of variables that we allocate on the Haskell side and
 -- pass into the C code to be filled.
@@ -110,7 +112,7 @@ solveCommon ODEOpts{..} OdeProblem{..}
             return 0
         funptr <- mkOdeRhsC funIO
         return (funptr, nullPtr)
-  _
+  undefined
 
 foreign import ccall "wrapper"
   mkOdeRhsC :: OdeRhsCType -> IO (FunPtr OdeRhsCType)
