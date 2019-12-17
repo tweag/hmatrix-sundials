@@ -15,6 +15,7 @@ module Numeric.Sundials.CVode.ODE
   ( odeSolveWithEvents
   , ODEMethod(..)
   , SolverResult(..)
+  , cvOdeC
   ) where
 
 import qualified Language.C.Inline as C
@@ -106,7 +107,6 @@ matrixToSunMatrix m = T.SunMatrix { T.rows = nr, T.cols = nc, T.vals = vs }
     -- FIXME: efficiency
     vs = V.fromList $ map coerce $ concat $ toLists m
 
--- cvOdeC CVars{..} ts f0 rTol event_fn_c jacIO aTols requested_event_directions report_error =
 cvOdeC :: CConsts -> CVars (V.MVector RealWorld) -> ReportErrorFn -> IO CInt
 cvOdeC CConsts{..} CVars{..} report_error =
   [C.block| int {

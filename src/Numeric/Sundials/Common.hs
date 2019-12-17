@@ -55,6 +55,7 @@ data CVars vec = CVars
 
 allocateCVars :: OdeProblem -> IO (CVars (VS.MVector RealWorld))
 allocateCVars OdeProblem{..} = do 
+  let dim = VS.length odeInitCond
   c_diagnostics <- VSM.new 11
   c_root_info <- VSM.new $ V.length odeEvents
   c_event_index <- VSM.new odeMaxEvents
@@ -62,9 +63,11 @@ allocateCVars OdeProblem{..} = do
   c_actual_event_direction <- VSM.new odeMaxEvents
   c_n_events <- VSM.new 1
   c_n_rows <- VSM.new 1
-  c_local_error <- VSM.new $ VS.length odeInitCond
-  c_var_weight <- VSM.new $ VS.length odeInitCond
+  c_local_error <- VSM.new dim
+  c_var_weight <- VSM.new dim
   c_local_error_set <- VSM.new 1
+  c_output_mat <- VSM.new $
+    (1 + dim) * (2 * odeMaxEvents + VS.length odeSolTimes)
   return CVars {..}
 
 -- NB: the mutable CVars must not be used after this
