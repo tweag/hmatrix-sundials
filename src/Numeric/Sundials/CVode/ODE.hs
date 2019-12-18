@@ -38,8 +38,8 @@ import           Data.Coerce (coerce)
 
 import           Numeric.LinearAlgebra.Devel (createVector)
 
-import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix, rows,
-                                                cols, toLists, reshape,
+import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix,
+                                                reshape,
                                                 subVector, toColumns, fromColumns, asColumn)
 
 import           Numeric.Sundials.Foreign (cV_ADAMS, cV_BDF,
@@ -76,36 +76,9 @@ data ODEMethod = ADAMS
                | BDF
   deriving (Eq, Ord, Show, Read)
 
--- Contrary to the documentation, it appears that CVodeGetRootInfo
--- may use both 1 and -1 to indicate a root, depending on the
--- direction of the sign change. See near the end of cvRootfind.
-intToDirection :: Integral d => d -> Maybe CrossingDirection
-intToDirection d =
-  case d of
-    1  -> Just Upwards
-    -1 -> Just Downwards
-    _  -> Nothing
-
--- | Almost inverse of 'intToDirection'. Map 'Upwards' to 1, 'Downwards' to
--- -1, and 'AnyDirection' to 0.
-directionToInt :: Integral d => CrossingDirection -> d
-directionToInt d =
-  case d of
-    Upwards -> 1
-    Downwards -> -1
-    AnyDirection -> 0
-
 getMethod :: ODEMethod -> Int
 getMethod (ADAMS) = cV_ADAMS
 getMethod (BDF)   = cV_BDF
-
-matrixToSunMatrix :: Matrix Double -> T.SunMatrix
-matrixToSunMatrix m = T.SunMatrix { T.rows = nr, T.cols = nc, T.vals = vs }
-  where
-    nr = fromIntegral $ rows m
-    nc = fromIntegral $ cols m
-    -- FIXME: efficiency
-    vs = V.fromList $ map coerce $ concat $ toLists m
 
 cvOdeC :: CConsts -> CVars (V.MVector RealWorld) -> ReportErrorFn -> IO CInt
 cvOdeC CConsts{..} CVars{..} report_error =

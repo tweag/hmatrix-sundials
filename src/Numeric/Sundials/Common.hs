@@ -10,10 +10,12 @@ import qualified Numeric.Sundials.Foreign as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
+import Data.Maybe
 import Numeric.LinearAlgebra.HMatrix hiding (Vector)
 import GHC.Prim
 import Control.Monad.IO.Class
 import Control.Monad.Cont
+import Control.Exception
 import Katip
 import Language.Haskell.TH
 
@@ -116,9 +118,62 @@ data CConsts = CConsts
   , c_init_step_size :: CDouble
   }
 
-withCConsts :: ODEOpts method -> OdeProblem -> (CConsts -> IO r) -> IO r
-withCConsts ODEOpts{..} OdeProblem{..} = undefined {- do
-  (rhs_funptr :: FunPtr OdeRhsCType, userdata :: Ptr UserData) <-
+class Method method where
+  methodToInt :: method -> CInt
+
+withCConsts
+  :: Method method
+  => ODEOpts method
+  -> OdeProblem
+  -> (CConsts -> IO r)
+  -> IO r
+withCConsts ODEOpts{..} OdeProblem{..} = runContT $ do
+  let
+    dim = VS.length c_init_cond
+    c_init_cond = coerce odeInitCond
+    c_dim = fromIntegral c_dim
+    c_n_sol_times = fromIntegral . VS.length $ odeSolTimes
+    c_sol_time = coerce odeSolTimes
+    c_rtol = relTolerance odeTolerances
+    c_atol = either (VS.replicate dim) id $ absTolerances odeTolerances
+    c_minstep = coerce minStep
+    c_max_n_steps = fromIntegral maxNumSteps
+    c_max_err_test_fails = fromIntegral maxFail
+    c_init_step_size_set = fromIntegral . fromEnum $ isJust initStep
+    c_init_step_size = coerce . fromMaybe undefined $ initStep
+    c_n_event_specs = fromIntegral $ V.length odeEvents
+    c_requested_event_direction = V.convert $ V.map (directionToInt . eventDirection) odeEvents
+    c_event_fn t y_ptr out_ptr _ptr = do
+      y <- sunVecVals <$> peek y_ptr
+      let vals = V.convert $ V.map (\ev -> coerce (eventCondition ev) t y) odeEvents
+      -- FIXME: We should be able to use poke somehow
+      T.vectorToC vals (fromIntegral c_n_event_specs) out_ptr
+      return 0
+    c_apply_event event_index t y_ptr y'_ptr = do
+      y_vec <- peek y_ptr
+      let
+        ev = odeEvents V.! (fromIntegral event_index)
+        y' = coerce (eventUpdate ev) t (sunVecVals y_vec)
+      poke y'_ptr $ SunVector
+        { sunVecN = sunVecN y_vec
+        , sunVecVals = y'
+        }
+      return 0
+    c_event_stops_solver = 
+      V.convert
+      . V.map (fromIntegral . fromEnum . eventStopSolver)
+      $ odeEvents
+    c_max_events = fromIntegral odeMaxEvents
+    c_jac_set = fromIntegral . fromEnum $ isJust odeJacobian
+    c_jac t y _fy jacS _ptr _tmp1 _tmp2 _tmp3 = do
+      case odeJacobian of
+        Nothing   -> undefined
+        Just jacI -> do j <- matrixToSunMatrix . jacI (coerce t) <$> (coerce $ sunVecVals <$> peek y)
+                        poke jacS j
+                        return 0
+    c_method = methodToInt odeMethod
+
+  (c_rhs, c_rhs_userdata) <-
     case odeRhs of
       OdeRhsC ptr u -> return (ptr, u)
       OdeRhsHaskell fun -> do
@@ -130,10 +185,39 @@ withCConsts ODEOpts{..} OdeProblem{..} = undefined {- do
                                , sunVecVals = fun t (sunVecVals sv)
                                }
             return 0
-        funptr <- mkOdeRhsC funIO
+        funptr <- ContT $ bracket (mkOdeRhsC funIO) freeHaskellFunPtr
         return (funptr, nullPtr)
-  undefined
--}
+  return CConsts{..}
+
+matrixToSunMatrix :: Matrix Double -> T.SunMatrix
+matrixToSunMatrix m = T.SunMatrix { T.rows = nr, T.cols = nc, T.vals = vs }
+  where
+    nr = fromIntegral $ rows m
+    nc = fromIntegral $ cols m
+    -- FIXME: efficiency
+    vs = VS.fromList $ map coerce $ concat $ toLists m
+
+-- Contrary to the documentation, it appears that CVodeGetRootInfo
+-- may use both 1 and -1 to indicate a root, depending on the
+-- direction of the sign change. See near the end of cvRootfind.
+intToDirection :: Integral d => d -> Maybe CrossingDirection
+intToDirection d =
+  case d of
+    1  -> Just Upwards
+    -1 -> Just Downwards
+    _  -> Nothing
+
+-- | Almost inverse of 'intToDirection'. Map 'Upwards' to 1, 'Downwards' to
+-- -1, and 'AnyDirection' to 0.
+directionToInt :: Integral d => CrossingDirection -> d
+directionToInt d =
+  case d of
+    Upwards -> 1
+    Downwards -> -1
+    AnyDirection -> 0
+
+foreign import ccall "wrapper"
+  mkOdeRhsC :: OdeRhsCType -> IO (FunPtr OdeRhsCType)
 
 assembleSolverResult
   :: CInt
@@ -143,7 +227,7 @@ assembleSolverResult = undefined
 
 -- | The common solving logic between ARKode and CVode
 solveCommon
-  :: Katip m
+  :: (Method method, Katip m)
   => (CConsts -> CVars (VS.MVector RealWorld) -> ReportErrorFn -> IO CInt)
       -- ^ the CVode/ARKode solving function; mostly inline-C code
   -> ODEOpts method
@@ -169,6 +253,3 @@ solveCommon solve_c opts problem@(OdeProblem{..})
       solve_c consts vars report_error
     frozenVars <- freezeCVars vars
     assembleSolverResult ret frozenVars
-
-foreign import ccall "wrapper"
-  mkOdeRhsC :: OdeRhsCType -> IO (FunPtr OdeRhsCType)
