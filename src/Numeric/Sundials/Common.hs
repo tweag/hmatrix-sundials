@@ -13,6 +13,7 @@ import qualified Data.Vector.Storable.Mutable as VSM
 import Numeric.LinearAlgebra.HMatrix hiding (Vector)
 import GHC.Prim
 import Control.Monad.IO.Class
+import Control.Monad.Cont
 import Katip
 import Language.Haskell.TH
 
@@ -71,19 +72,19 @@ allocateCVars OdeProblem{..} = do
   return CVars {..}
 
 -- NB: the mutable CVars must not be used after this
-freezeCVars :: CVars (V.MVector RealWorld) -> IO (CVars V.Vector)
+freezeCVars :: CVars (VS.MVector RealWorld) -> IO (CVars VS.Vector)
 freezeCVars CVars{..} = do
-  c_diagnostics <- V.unsafeFreeze c_diagnostics
-  c_root_info <- V.unsafeFreeze c_root_info
-  c_event_index <- V.unsafeFreeze c_event_index
-  c_event_time <- V.unsafeFreeze c_event_time
-  c_actual_event_direction <- V.unsafeFreeze c_actual_event_direction
-  c_n_events <- V.unsafeFreeze c_n_events
-  c_n_rows <- V.unsafeFreeze c_n_rows
-  c_output_mat <- V.unsafeFreeze c_output_mat
-  c_local_error <- V.unsafeFreeze c_local_error
-  c_var_weight <- V.unsafeFreeze c_var_weight
-  c_local_error_set <- V.unsafeFreeze c_local_error_set
+  c_diagnostics <- VS.unsafeFreeze c_diagnostics
+  c_root_info <- VS.unsafeFreeze c_root_info
+  c_event_index <- VS.unsafeFreeze c_event_index
+  c_event_time <- VS.unsafeFreeze c_event_time
+  c_actual_event_direction <- VS.unsafeFreeze c_actual_event_direction
+  c_n_events <- VS.unsafeFreeze c_n_events
+  c_n_rows <- VS.unsafeFreeze c_n_rows
+  c_output_mat <- VS.unsafeFreeze c_output_mat
+  c_local_error <- VS.unsafeFreeze c_local_error
+  c_var_weight <- VS.unsafeFreeze c_var_weight
+  c_local_error_set <- VS.unsafeFreeze c_local_error_set
   return CVars {..}
 
 -- | Similar to 'CVars', except these are immutable values that are
@@ -115,25 +116,8 @@ data CConsts = CConsts
   , c_init_step_size :: CDouble
   }
 
--- | The common solving logic between ARKode and CVode
-solveCommon
-  :: Katip m
-  => ODEOpts method
-  -> OdeProblem
-  -> m (Either ErrorDiagnostics SundialsSolution)
-solveCommon ODEOpts{..} OdeProblem{..}
-
-  | VS.null odeInitCond = -- 0-dimensional (empty) system
-    return . Right $ SundialsSolution
-      { actualTimeGrid = odeSolTimes
-      , solutionMatrix = (VS.length odeSolTimes >< 0) []
-      , eventInfo = []
-      , diagnostics = emptyDiagnostics
-      }
-
-  | otherwise = do
-  report_error <- logWithKatip
-  liftIO $ do -- the rest is in the IO monad
+withCConsts :: ODEOpts method -> OdeProblem -> (CConsts -> IO r) -> IO r
+withCConsts ODEOpts{..} OdeProblem{..} = undefined {- do
   (rhs_funptr :: FunPtr OdeRhsCType, userdata :: Ptr UserData) <-
     case odeRhs of
       OdeRhsC ptr u -> return (ptr, u)
@@ -149,6 +133,42 @@ solveCommon ODEOpts{..} OdeProblem{..}
         funptr <- mkOdeRhsC funIO
         return (funptr, nullPtr)
   undefined
+-}
+
+assembleSolverResult
+  :: CInt
+  -> CVars VS.Vector
+  -> IO (Either ErrorDiagnostics SundialsSolution)
+assembleSolverResult = undefined
+
+-- | The common solving logic between ARKode and CVode
+solveCommon
+  :: Katip m
+  => (CConsts -> CVars (VS.MVector RealWorld) -> ReportErrorFn -> IO CInt)
+      -- ^ the CVode/ARKode solving function; mostly inline-C code
+  -> ODEOpts method
+  -> OdeProblem
+  -> m (Either ErrorDiagnostics SundialsSolution)
+solveCommon solve_c opts problem@(OdeProblem{..})
+
+  | VS.null odeInitCond = -- 0-dimensional (empty) system
+
+    return . Right $ SundialsSolution
+      { actualTimeGrid = odeSolTimes
+      , solutionMatrix = (VS.length odeSolTimes >< 0) []
+      , eventInfo = []
+      , diagnostics = emptyDiagnostics
+      }
+
+  | otherwise = do
+
+    report_error <- logWithKatip
+    liftIO $ do -- the rest is in the IO monad
+    vars <- allocateCVars problem
+    ret <- withCConsts opts problem $ \consts ->
+      solve_c consts vars report_error
+    frozenVars <- freezeCVars vars
+    assembleSolverResult ret frozenVars
 
 foreign import ccall "wrapper"
   mkOdeRhsC :: OdeRhsCType -> IO (FunPtr OdeRhsCType)
