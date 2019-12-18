@@ -4,6 +4,7 @@
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Numeric.Sundials
 import Numeric.Sundials.Types
 import qualified Numeric.Sundials.ARKode.ODE as ARK
 import qualified Numeric.Sundials.CVode.ODE  as CV
@@ -32,14 +33,6 @@ data OdeSolver = forall method . Show method => OdeSolver
     -> OdeProblem
     -> m (Either ErrorDiagnostics SundialsSolution)
   )
-
-solveCV
-  :: Katip m
-  => ODEOpts CV.ODEMethod
-  -> OdeProblem
-  -> m (Either ErrorDiagnostics SundialsSolution)
-solveCV opts OdeProblem{..} =
-  CV.odeSolveWithEvents opts {stepControl = odeTolerances} (VB.toList odeEvents {-FIXME-}) odeMaxEvents odeRhs odeJacobian odeInitCond odeSolTimes
 
 solveARK
   :: Katip m
