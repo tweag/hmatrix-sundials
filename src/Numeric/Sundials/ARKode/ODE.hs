@@ -161,7 +161,7 @@ instance Show ODEMethod where
   show x = constrName x
 
 -- FIXME: We can probably do better here with generics
-getMethod :: ODEMethod -> Int
+getMethod :: ODEMethod -> CInt
 getMethod (SDIRK_2_1_2 _)            = sDIRK_2_1_2
 getMethod (SDIRK_2_1_2')             = sDIRK_2_1_2
 getMethod (BILLINGTON_3_3_2 _)       = bILLINGTON_3_3_2

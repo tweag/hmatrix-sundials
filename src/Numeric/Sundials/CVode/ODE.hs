@@ -76,9 +76,9 @@ data ODEMethod = ADAMS
                | BDF
   deriving (Eq, Ord, Show, Read)
 
-getMethod :: ODEMethod -> Int
-getMethod (ADAMS) = cV_ADAMS
-getMethod (BDF)   = cV_BDF
+instance Method ODEMethod where
+  methodToInt ADAMS = cV_ADAMS
+  methodToInt BDF   = cV_BDF
 
 cvOdeC :: CConsts -> CVars (V.MVector RealWorld) -> ReportErrorFn -> IO CInt
 cvOdeC CConsts{..} CVars{..} report_error =
@@ -478,7 +478,7 @@ solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
                           -- Unsafe since the function will be called many times.
                           [CU.exp| int{ 0 } |]
 
-  res :: Int <- fromIntegral <$> [C.block| int {
+  res <- [C.block| int {
                          /* general problem variables */
 
                          int flag;                  /* reusable error-checking flag                 */
@@ -794,7 +794,7 @@ solveOdeC maxErrTestFails maxNumSteps_ minStep_ method initStepSize
       else
         SolverError ErrorDiagnostics
           { partialResults = output_mat
-          , errorCode = res
+          , errorCode = fromIntegral res
           , errorEstimates = local_errors
           , varWeights = var_weights
           }
@@ -824,7 +824,7 @@ odeSolveRootVWith'
 odeSolveRootVWith' opts rhs mb_jacobian y0 event_specs nRootEvs tt =
   solveOdeC (fromIntegral $ maxFail opts)
                  (fromIntegral $ maxNumSteps opts) (coerce $ minStep opts)
-                 (fromIntegral . getMethod . odeMethod $ opts) (coerce $ initStep opts) jacH (stepControl opts)
+                 (methodToInt . odeMethod $ opts) (coerce $ initStep opts) jacH (stepControl opts)
                  rhs (coerce y0)
                  (genericLength event_specs)
                  event_equations
