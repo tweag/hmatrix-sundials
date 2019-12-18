@@ -131,7 +131,7 @@ withCConsts ODEOpts{..} OdeProblem{..} = runContT $ do
   let
     dim = VS.length c_init_cond
     c_init_cond = coerce odeInitCond
-    c_dim = fromIntegral c_dim
+    c_dim = fromIntegral dim
     c_n_sol_times = fromIntegral . VS.length $ odeSolTimes
     c_sol_time = coerce odeSolTimes
     c_rtol = relTolerance odeTolerances
