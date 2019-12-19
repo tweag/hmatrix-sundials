@@ -282,7 +282,12 @@ arkOdeC CConsts{..} CVars{..} report_error =
           break;
         }
 
-        flag = ARKStepReInit(arkode_mem, t, y);
+        /* Reinitialize */
+        if ($(int c_method) < MIN_DIRK_NUM) {
+          flag = ARKStepReInit(arkode_mem, c_rhs, NULL, t, y);
+        } else {
+          flag = ARKStepReInit(arkode_mem, NULL, c_rhs, t, y);
+        }
         if (check_flag(&flag, "ARKStepReInit", 1, report_error)) return(1);
       } else {
         /* Since this is not a wanted event, it shouldn't get a row */
