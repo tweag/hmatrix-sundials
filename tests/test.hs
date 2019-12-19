@@ -10,8 +10,8 @@ import qualified Numeric.Sundials.ARKode.ODE as ARK
 import qualified Numeric.Sundials.CVode.ODE  as CV
 import Numeric.Sundials.Types
 import Numeric.LinearAlgebra as L
-import qualified Data.Vector.Storable as V
-import qualified Data.Vector as VB
+import qualified Data.Vector.Storable as VS
+import qualified Data.Vector as V
 import Katip
 import Foreign.C.Types
 import System.IO
@@ -44,7 +44,7 @@ solveARK opts OdeProblem{..} = do
         OdeRhsHaskell rhsH -> rhsH
         OdeRhsC {} -> error "Compiled RHS is not yet supported with ARKode" -- FIXME
   fmap (first $ \e -> ErrorDiagnostics e mempty mempty mempty) $ -- FIXME
-    ARK.odeSolveWithEvents opts (VB.toList odeEvents) odeMaxEvents (coerce rhs) odeJacobian odeInitCond odeSolTimes
+    ARK.odeSolveWithEvents opts (V.toList odeEvents) odeMaxEvents (coerce rhs) odeJacobian odeInitCond odeSolTimes
 
 availableSolvers :: [OdeSolver]
 availableSolvers =
@@ -146,9 +146,9 @@ eventTests opts solver = testGroup "Events"
   [ testCase "Exponential" $ do
       Right (eventInfo -> events) <- runKatipT ?log_env $ solver opts exponential
       length events @?= 1
-      checkDiscrepancy 1e-4 (abs (eventTime (events!!0) - log 1.1))
-      rootDirection (events!!0) @?= Upwards
-      eventIndex (events!!0) @?= 0
+      checkDiscrepancy 1e-4 (abs (eventTime (events V.! 0) - log 1.1))
+      rootDirection (events V.! 0) @?= Upwards
+      eventIndex (events V.! 0) @?= 0
   , testCase "Robertson" $ do
       let upd _ _ = vector [1.0, 0.0, 0.0]
       Right (eventInfo -> events) <- runKatipT ?log_env $ solver opts
@@ -172,9 +172,9 @@ eventTests opts solver = testGroup "Events"
   , testCase "Bounded sine" $ do
       Right (eventInfo -> events) <- runKatipT ?log_env $ solver opts boundedSine
       length events @?= 3
-      map rootDirection events @?= [Upwards, Downwards, Upwards]
-      map eventIndex events @?= [0, 1, 0]
-      forM_ (zip (map eventTime events) [1.119766,3.359295,5.598820]) $ \(et_got, et_exp) ->
+      V.map rootDirection events @?= [Upwards, Downwards, Upwards]
+      V.map eventIndex events @?= [0, 1, 0]
+      V.forM_ (V.zip (V.map eventTime events) [1.119766,3.359295,5.598820]) $ \(et_got, et_exp) ->
         checkDiscrepancy 1e-4 (abs (et_exp - et_got))
   ]
 
@@ -186,9 +186,9 @@ brusselator :: (String, OdeProblem)
 brusselator = (,) "brusselator" $ OdeProblem
   { odeRhs = OdeRhsHaskell $ \_t x ->
       let
-        u = x V.! 0
-        v = x V.! 1
-        w = x V.! 2
+        u = x VS.! 0
+        v = x VS.! 1
+        w = x VS.! 2
       in
       [ a - (w + 1) * u + v * u * u
       , w * u - v * u * u
@@ -196,9 +196,9 @@ brusselator = (,) "brusselator" $ OdeProblem
       ]
   , odeJacobian = Just $ \(_t :: Double) x ->
       let
-        u = x V.! 0
-        v = x V.! 1
-        w = x V.! 2
+        u = x VS.! 0
+        v = x VS.! 1
+        w = x VS.! 2
       in (3><3)
       [ (-(w + 1.0)) + 2.0 * u * v, w - 2.0 * u * v, (-w)
       , u * u                     , (-(u * u))     , 0.0
@@ -217,7 +217,7 @@ brusselator = (,) "brusselator" $ OdeProblem
     eps = 5.0e-6
 
 exponential = OdeProblem
-  { odeRhs = OdeRhsHaskell $ \_ y -> [y V.! 0]
+  { odeRhs = OdeRhsHaskell $ \_ y -> [y VS.! 0]
   , odeJacobian = Nothing
   , odeInitCond = vector [1]
   , odeEvents = events
@@ -235,12 +235,12 @@ exponential = OdeProblem
       ]
 
 robertson = (,) "Robertson" $ OdeProblem
-  { odeRhs = OdeRhsHaskell $ \_ (V.toList -> [y1,y2,y3]) ->
+  { odeRhs = OdeRhsHaskell $ \_ (VS.toList -> [y1,y2,y3]) ->
       [ -0.04 * y1 + 1.0e4 * y2 * y3
       , 0.04 * y1 - 1.0e4 * y2 * y3 - 3.0e7 * (y2)^(2 :: Int)
       , 3.0e7 * (y2)^(2 :: Int)
       ]
-  , odeJacobian = Just $ \_t (V.toList -> [_, y2, y3]) -> (3 >< 3)
+  , odeJacobian = Just $ \_t (VS.toList -> [_, y2, y3]) -> (3 >< 3)
       [ -0.04, 1.0e4 * y3, 1.0e4 * y2
       , 0.04, -1.0e4*y3 - 3.0e7*2*y2, -1.0e4*y2
       , 0, 3.0e7*2*y2, 0
@@ -263,7 +263,7 @@ empty = (,) "Empty system" $ OdeProblem
   }
 
 stiffish = (,) "Stiffish" $ OdeProblem
-  { odeRhs = OdeRhsHaskell $ \t ((V.! 0) -> u) -> [ lamda * u + 1.0 / (1.0 + t * t) - lamda * atan t ]
+  { odeRhs = OdeRhsHaskell $ \t ((VS.! 0) -> u) -> [ lamda * u + 1.0 / (1.0 + t * t) - lamda * atan t ]
   , odeJacobian = Nothing
   , odeInitCond = [0.0]
   , odeEvents = []
@@ -277,12 +277,12 @@ stiffish = (,) "Stiffish" $ OdeProblem
 -- A sine wave that only changes direction once it reaches ±0.9.
 -- Illustrates event-specific reset function
 boundedSine = OdeProblem
-  { odeRhs = OdeRhsHaskell $ \_t y -> [y V.! 1, - y V.! 0]
+  { odeRhs = OdeRhsHaskell $ \_t y -> [y VS.! 1, - y VS.! 0]
   , odeJacobian = Nothing
   , odeInitCond = [0,1]
   , odeEvents = events
   , odeMaxEvents = 100
-  , odeSolTimes = V.fromList [ 2 * pi * k / 360 | k <- [0..360]]
+  , odeSolTimes = VS.fromList [ 2 * pi * k / 360 | k <- [0..360]]
   , odeTolerances = defaultTolerances
   }
   where
