@@ -1,5 +1,5 @@
 -- | Common infrastructure for CVode/ARKode
-{-# LANGUAGE TemplateHaskell, NamedFieldPuns #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Numeric.Sundials.Common where
 
 import Foreign.C.Types
