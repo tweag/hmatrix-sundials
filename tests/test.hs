@@ -34,22 +34,10 @@ data OdeSolver = forall method . Show method => OdeSolver
     -> m (Either ErrorDiagnostics SundialsSolution)
   )
 
-solveARK
-  :: Katip m
-  => ODEOpts ARK.ODEMethod
-  -> OdeProblem
-  -> m (Either ErrorDiagnostics SundialsSolution)
-solveARK opts OdeProblem{..} = do
-  let rhs = case odeRhs of
-        OdeRhsHaskell rhsH -> rhsH
-        OdeRhsC {} -> error "Compiled RHS is not yet supported with ARKode" -- FIXME
-  fmap (first $ \e -> ErrorDiagnostics e mempty mempty mempty) $ -- FIXME
-    ARK.odeSolveWithEvents opts (V.toList odeEvents) odeMaxEvents (coerce rhs) odeJacobian odeInitCond odeSolTimes
-
 availableSolvers :: [OdeSolver]
 availableSolvers =
   [ OdeSolver "CVode"  [CV.BDF, CV.ADAMS] solveCV
-  , OdeSolver "ARKode" [ARK.SDIRK_5_3_4', ARK.TRBDF2_3_3_2'] solveARK
+  , OdeSolver "ARKode" [ARK.SDIRK_5_3_4, ARK.TRBDF2_3_3_2] solveARK
   ]
 
 defaultOpts :: method -> ODEOpts method
