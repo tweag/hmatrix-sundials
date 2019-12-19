@@ -235,10 +235,10 @@ assembleSolverResult OdeProblem{..} ret CVars{..} = do
         then (mempty, mempty)
         else coerce (c_local_error, c_var_weight)
     eventInfo :: V.Vector EventInfo
-    eventInfo = V.zipWith3 EventInfo
+    eventInfo = V.take (fromIntegral $ c_n_events VS.! 0) $ V.zipWith3 EventInfo
       (V.convert . (coerce :: VS.Vector CDouble -> VS.Vector Double) $ c_event_time)
       (V.convert . VS.map fromIntegral $ c_event_index)
-      (V.map (fromJust . intToDirection) $ V.convert c_actual_event_direction)
+      (V.map (fromMaybe undefined . intToDirection) $ V.convert c_actual_event_direction)
     diagnostics = SundialsDiagnostics
       (fromIntegral $ c_diagnostics VS.!0)
       (fromIntegral $ c_diagnostics VS.!1)
