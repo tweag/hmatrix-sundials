@@ -16,7 +16,7 @@ solveCV = solveCommon CV.cvOdeC
 
 solveARK
   :: Katip m
-  => ODEOpts CV.ODEMethod
+  => ODEOpts ARK.ODEMethod
   -> OdeProblem
   -> m (Either ErrorDiagnostics SundialsSolution)
 solveARK = solveCommon ARK.arkOdeC
