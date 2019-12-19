@@ -51,7 +51,6 @@ library
                        TypeSynonymInstances
                        FlexibleInstances
                        FlexibleContexts
-                       DeriveGeneric
 
 test-suite test
   type:                exitcode-stdio-1.0

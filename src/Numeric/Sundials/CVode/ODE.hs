@@ -56,9 +56,7 @@ cvOdeC CConsts{..} CVars{..} report_error =
   SUNLinearSolver LS = NULL; /* empty linear solver object                   */
   void *cvode_mem = NULL;    /* empty CVODE memory structure                 */
   realtype t;
-  long int nst, nfe, nsetups, nje, nfeLS, nni, ncfn, netf, nge;
-
-  realtype tout;
+  long int nst, nfe, nsetups, nje, nfeLS, nni, ncfn, netf;
 
   /* input_ind tracks the current index into the c_sol_time array */
   int input_ind = 1;
@@ -299,7 +297,6 @@ cvOdeC CConsts{..} CVars{..} report_error =
   ($vec-ptr:(sunindextype *c_diagnostics))[9] = ncfn;
 
   /* Clean up and return */
-
   N_VDestroy(y);          /* Free y vector          */
   N_VDestroy(tv);         /* Free tv vector         */
   CVodeFree(&cvode_mem);  /* Free integrator memory */
