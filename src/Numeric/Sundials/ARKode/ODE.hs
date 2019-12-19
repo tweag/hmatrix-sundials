@@ -139,11 +139,15 @@ arkOdeC CConsts{..} CVars{..} report_error =
   ARKRhsFn c_rhs = $(int (*c_rhs)(double, SunVector*, SunVector*, UserData*));
   if ($(int c_method) < MIN_DIRK_NUM) {
     arkode_mem = ARKStepCreate(c_rhs, NULL, T0, y);
-    if (check_flag(arkode_mem, "ARKStepCreate", 0, report_error)) return 1;
   } else {
     arkode_mem = ARKStepCreate(NULL, c_rhs, T0, y);
-    if (check_flag(arkode_mem, "ARKStepCreate", 0, report_error)) return 1;
   }
+  if (check_flag(arkode_mem, "ARKStepCreate", 0, report_error)) return 1;
+
+  flag = ARKStepSetErrHandlerFn(arkode_mem, report_error, NULL);
+  if (check_flag(&flag, "ARKStepSetErrHandlerFn", 1, report_error)) return 1;
+  flag = ARKStepSetUserData(arkode_mem, $(UserData* c_rhs_userdata));
+  if (check_flag(&flag, "ARKStepSetUserData", 1, report_error)) return(1);
 
   tv = N_VNew_Serial(c_dim); /* Create serial vector for absolute tolerances */
   if (check_flag((void *)tv, "N_VNew_Serial", 0, report_error)) return 1;

@@ -99,9 +99,6 @@ cvOdeC CConsts{..} CVars{..} report_error =
   flag = CVodeSetErrHandlerFn(cvode_mem, report_error, NULL);
   if (check_flag(&flag, "CVodeSetErrHandlerFn", 1, report_error)) return 1;
 
-  /* Call CVodeInit to initialize the integrator memory and specify the
-   * user's right hand side function in y'=f(t,y), the inital time T0, and
-   * the initial dependent variable vector y. */
   flag = CVodeInit(cvode_mem, $(int (* c_rhs) (double t, SunVector y[], SunVector dydt[], UserData* params)), T0, y);
   if (check_flag(&flag, "CVodeInit", 1, report_error)) return(1);
   flag = CVodeSetUserData(cvode_mem, $(UserData* c_rhs_userdata));
