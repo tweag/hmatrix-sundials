@@ -12,47 +12,18 @@
 --
 -- <https://computation.llnl.gov/projects/sundials/sundials-software>
 module Numeric.Sundials.CVode.ODE
-  ( odeSolveWithEvents
-  , ODEMethod(..)
-  , SolverResult(..)
+  ( ODEMethod(..)
   , cvOdeC
   ) where
 
 import qualified Language.C.Inline as C
-import qualified Language.C.Inline.Unsafe as CU
-
-import           Data.Monoid ((<>))
-import           Data.Maybe
-import           Data.List (genericLength)
-import           Control.Applicative
-
-import           Foreign.C.Types (CDouble, CInt)
-import           Foreign.Ptr
-import           Foreign.Storable (peek, poke)
-
-import qualified Data.Vector.Storable as V
-import qualified Data.Vector.Storable.Mutable as VM
-import qualified Data.Vector as VB -- B for Boxed
-
-import           Data.Coerce (coerce)
-
-import           Numeric.LinearAlgebra.Devel (createVector)
-
-import           Numeric.LinearAlgebra.HMatrix (Vector, Matrix,
-                                                reshape,
-                                                subVector, toColumns, fromColumns, asColumn)
-
-import           Numeric.Sundials.Foreign (cV_ADAMS, cV_BDF,
-                                          vectorToC, cV_SUCCESS,
-                                          SunVector(..), SunIndexType)
-import qualified Numeric.Sundials.Foreign as T
-import           Numeric.Sundials.Types
-import Numeric.Sundials.Common
-
-import Control.Monad.IO.Class
-import Katip
+import qualified Data.Vector.Storable as VS
+import Foreign.C.Types
 import GHC.Prim
 
+import Numeric.Sundials.Foreign
+import Numeric.Sundials.Types
+import Numeric.Sundials.Common
 
 C.context (C.baseCtx <> C.vecCtx <> C.funCtx <> sunCtx)
 
@@ -80,7 +51,7 @@ instance Method ODEMethod where
   methodToInt ADAMS = cV_ADAMS
   methodToInt BDF   = cV_BDF
 
-cvOdeC :: CConsts -> CVars (V.MVector RealWorld) -> ReportErrorFn -> IO CInt
+cvOdeC :: CConsts -> CVars (VS.MVector RealWorld) -> ReportErrorFn -> IO CInt
 cvOdeC CConsts{..} CVars{..} report_error =
   [C.block| int {
   /* general problem variables */
