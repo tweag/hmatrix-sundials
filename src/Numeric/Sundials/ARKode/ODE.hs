@@ -321,7 +321,7 @@ odeSolveWithEvents opts events _ rhs _mb_jac y0 times
                     -- here unlike in CVode. If/when we add event support
                     -- to ARKode, this is going to change.
                     mx
-                , eventInfo = []
+                , eventInfo = mempty
                 , diagnostics = diagn
                 }
 

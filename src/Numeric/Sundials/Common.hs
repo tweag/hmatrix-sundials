@@ -1,5 +1,5 @@
 -- | Common infrastructure for CVode/ARKode
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, NamedFieldPuns #-}
 module Numeric.Sundials.Common where
 
 import Foreign.C.Types
@@ -69,6 +69,7 @@ allocateCVars OdeProblem{..} = do
   c_local_error <- VSM.new dim
   c_var_weight <- VSM.new dim
   c_local_error_set <- VSM.new 1
+  VSM.write c_local_error_set 0 0
   c_output_mat <- VSM.new $
     (1 + dim) * (2 * odeMaxEvents + VS.length odeSolTimes)
   return CVars {..}
@@ -220,10 +221,58 @@ foreign import ccall "wrapper"
   mkOdeRhsC :: OdeRhsCType -> IO (FunPtr OdeRhsCType)
 
 assembleSolverResult
-  :: CInt
+  :: OdeProblem
+  -> CInt
   -> CVars VS.Vector
   -> IO (Either ErrorDiagnostics SundialsSolution)
-assembleSolverResult = undefined
+assembleSolverResult OdeProblem{..} ret CVars{..} = do
+  let
+    dim = VS.length odeInitCond
+    n_rows = fromIntegral . VS.head $ c_n_rows
+    output_mat = coerce . reshape (dim + 1) . subVector 0 ((dim + 1) * n_rows) $ c_output_mat
+    (local_errors, var_weights) =
+      if c_local_error_set VS.! 0 == 0
+        then (mempty, mempty)
+        else coerce (c_local_error, c_var_weight)
+    eventInfo :: V.Vector EventInfo
+    eventInfo = V.zipWith3 EventInfo
+      (V.convert . (coerce :: VS.Vector CDouble -> VS.Vector Double) $ c_event_time)
+      (V.convert . VS.map fromIntegral $ c_event_index)
+      (V.map (fromJust . intToDirection) $ V.convert c_actual_event_direction)
+    diagnostics = SundialsDiagnostics
+      (fromIntegral $ c_diagnostics VS.!0)
+      (fromIntegral $ c_diagnostics VS.!1)
+      (fromIntegral $ c_diagnostics VS.!2)
+      (fromIntegral $ c_diagnostics VS.!3)
+      (fromIntegral $ c_diagnostics VS.!4)
+      (fromIntegral $ c_diagnostics VS.!5)
+      (fromIntegral $ c_diagnostics VS.!6)
+      (fromIntegral $ c_diagnostics VS.!7)
+      (fromIntegral $ c_diagnostics VS.!8)
+      (fromIntegral $ c_diagnostics VS.!9)
+      (toEnum . fromIntegral $ c_diagnostics VS.! 10)
+  return $
+    if ret == T.cV_SUCCESS
+      then
+        Right $ SundialsSolution
+          { actualTimeGrid = extractTimeGrid output_mat
+          , solutionMatrix = dropTimeGrid output_mat
+          , eventInfo
+          , diagnostics
+          }
+      else
+        Left ErrorDiagnostics
+          { partialResults = output_mat
+          , errorCode = fromIntegral ret
+          , errorEstimates = local_errors
+          , varWeights = var_weights
+          }
+  where
+    -- The time grid is the first column of the result matrix
+    extractTimeGrid :: Matrix Double -> VS.Vector Double
+    extractTimeGrid = head . toColumns
+    dropTimeGrid :: Matrix Double -> Matrix Double
+    dropTimeGrid = fromColumns . tail . toColumns
 
 -- | The common solving logic between ARKode and CVode
 solveCommon
@@ -240,7 +289,7 @@ solveCommon solve_c opts problem@(OdeProblem{..})
     return . Right $ SundialsSolution
       { actualTimeGrid = odeSolTimes
       , solutionMatrix = (VS.length odeSolTimes >< 0) []
-      , eventInfo = []
+      , eventInfo = mempty
       , diagnostics = emptyDiagnostics
       }
 
@@ -252,4 +301,4 @@ solveCommon solve_c opts problem@(OdeProblem{..})
     ret <- withCConsts opts problem $ \consts ->
       solve_c consts vars report_error
     frozenVars <- freezeCVars vars
-    assembleSolverResult ret frozenVars
+    assembleSolverResult problem ret frozenVars

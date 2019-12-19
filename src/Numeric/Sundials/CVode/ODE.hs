@@ -876,7 +876,7 @@ odeSolveWithEvents opts event_specs max_events rhs mb_jacobian initial sol_times
       Right $ SundialsSolution
           { actualTimeGrid = extractTimeGrid mx
           , solutionMatrix = dropTimeGrid mx
-          , eventInfo = events
+          , eventInfo = VB.fromList events
           , diagnostics = diagn
           }
   where

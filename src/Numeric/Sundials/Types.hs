@@ -120,7 +120,7 @@ data SundialsSolution =
   SundialsSolution
   { actualTimeGrid :: VS.Vector Double    -- ^ actual time grid returned by the solver (with duplicated event times)
   , solutionMatrix :: Matrix Double       -- ^ matrix of solutions: each column is an unknwown
-  , eventInfo      :: [EventInfo]         -- ^ event infos, as many items as triggered events during the simulation
+  , eventInfo      :: V.Vector EventInfo  -- ^ event infos, as many items as triggered events during the simulation
   , diagnostics    :: SundialsDiagnostics -- ^ usual Sundials diagnostics
   }
 
@@ -138,7 +138,7 @@ data ErrorDiagnostics = ErrorDiagnostics
     -- space.
   , partialResults :: !(Matrix Double)
     -- ^ Partial solution of the ODE system, up until the moment when
-    -- solving failed.
+    -- solving failed. Contains the time as its first column.
   } deriving Show
 
 data EventInfo =
