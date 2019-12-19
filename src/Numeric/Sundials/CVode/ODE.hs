@@ -95,12 +95,14 @@ cvOdeC CConsts{..} CVars{..} report_error =
   // NB: Uses the Newton solver by default
   cvode_mem = CVodeCreate($(int c_method));
   if (check_flag((void *)cvode_mem, "CVodeCreate", 0, report_error)) return(1);
+  flag = CVodeInit(cvode_mem, $(int (* c_rhs) (double t, SunVector y[], SunVector dydt[], UserData* params)), T0, y);
+  if (check_flag(&flag, "CVodeInit", 1, report_error)) return(1);
 
+  /* Set the error handler */
   flag = CVodeSetErrHandlerFn(cvode_mem, report_error, NULL);
   if (check_flag(&flag, "CVodeSetErrHandlerFn", 1, report_error)) return 1;
 
-  flag = CVodeInit(cvode_mem, $(int (* c_rhs) (double t, SunVector y[], SunVector dydt[], UserData* params)), T0, y);
-  if (check_flag(&flag, "CVodeInit", 1, report_error)) return(1);
+  /* Set the user data */
   flag = CVodeSetUserData(cvode_mem, $(UserData* c_rhs_userdata));
   if (check_flag(&flag, "CVodeSetUserData", 1, report_error)) return(1);
 
@@ -118,14 +120,12 @@ cvOdeC CConsts{..} CVars{..} report_error =
   flag = CVodeSetMaxErrTestFails(cvode_mem, $(int c_max_err_test_fails));
   if (check_flag(&flag, "CVodeSetMaxErrTestFails", 1, report_error)) return 1;
 
-  /* Call CVodeSVtolerances to specify the scalar relative tolerance
-   * and vector absolute tolerances */
+  /* Specify the scalar relative tolerance and vector absolute tolerances */
   flag = CVodeSVtolerances(cvode_mem, $(double c_rtol), tv);
   if (check_flag(&flag, "CVodeSVtolerances", 1, report_error)) return(1);
 
-  /* Call CVodeRootInit to specify the root function c_event_fn with c_n_event_specs components */
+  /* Specify the root function */
   flag = CVodeRootInit(cvode_mem, $(int c_n_event_specs), $fun:(int (* c_event_fn) (double t, SunVector y[], double gout[], void * params)));
-
   if (check_flag(&flag, "CVodeRootInit", 1, report_error)) return(1);
 
   /* Initialize dense matrix data structure and solver */

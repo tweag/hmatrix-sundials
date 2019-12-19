@@ -144,8 +144,11 @@ arkOdeC CConsts{..} CVars{..} report_error =
   }
   if (check_flag(arkode_mem, "ARKStepCreate", 0, report_error)) return 1;
 
+  /* Set the error handler */
   flag = ARKStepSetErrHandlerFn(arkode_mem, report_error, NULL);
   if (check_flag(&flag, "ARKStepSetErrHandlerFn", 1, report_error)) return 1;
+
+  /* Set the user data */
   flag = ARKStepSetUserData(arkode_mem, $(UserData* c_rhs_userdata));
   if (check_flag(&flag, "ARKStepSetUserData", 1, report_error)) return(1);
 
@@ -163,9 +166,13 @@ arkOdeC CConsts{..} CVars{..} report_error =
   flag = ARKStepSetMaxErrTestFails(arkode_mem, $(int c_max_err_test_fails));
   if (check_flag(&flag, "ARKStepSetMaxErrTestFails", 1, report_error)) return 1;
 
-  /* Set routines */
+  /* Specify the scalar relative tolerance and vector absolute tolerances */
   flag = ARKStepSVtolerances(arkode_mem, $(double c_rtol), tv);
   if (check_flag(&flag, "ARKStepSVtolerances", 1, report_error)) return 1;
+
+  /* Specify the root function */
+  flag = ARKStepRootInit(arkode_mem, $(int c_n_event_specs), $fun:(int (* c_event_fn) (double t, SunVector y[], double gout[], void * params)));
+  if (check_flag(&flag, "ARKStepRootInit", 1, report_error)) return(1);
 
   /* Initialize dense matrix data structure and solver */
   A = SUNDenseMatrix(c_dim, c_dim);
