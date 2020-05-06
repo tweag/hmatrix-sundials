@@ -13,6 +13,7 @@ import Numeric.Sundials.Common
 import Numeric.Sundials.CVode as CV
 import Numeric.Sundials.ARKode as ARK
 import Katip
+import Debug.Trace
 
 -- | Solve an ODE system using either ARKode or CVode (depending on what
 -- @method@ is instantiated with).
@@ -21,7 +22,7 @@ solve
   => ODEOpts method -- ^ solver options
   -> OdeProblem -- ^ the ODE system to solve
   -> m (Either ErrorDiagnostics SundialsSolution)
-solve =
+solve = trace "xxx sundials: entered solve" $
   case methodSolver @method of
     CVode -> solveCommon CV.solveC
     ARKode -> solveCommon ARK.solveC

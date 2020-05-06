@@ -14,6 +14,7 @@ import GHC.Prim
 import Numeric.Sundials.Foreign
 import Numeric.Sundials.Types
 import Numeric.Sundials.Common
+import Debug.Trace
 
 C.context (C.baseCtx <> C.vecCtx <> C.funCtx <> sunCtx)
 
@@ -43,7 +44,7 @@ instance Method CVMethod where
   methodSolver = CVode
 
 solveC :: CConsts -> CVars (VS.MVector RealWorld) -> ReportErrorFn -> IO CInt
-solveC CConsts{..} CVars{..} report_error =
+solveC CConsts{..} CVars{..} report_error = trace "xxx sundials: entered solveC" $
   [C.block| int {
   /* general problem variables */
 
