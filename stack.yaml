@@ -2,3 +2,13 @@ extra-deps:
 - tasty-golden-2.3.3
 resolver: nightly-2020-01-30
 allow-newer: true
+extra-include-dirs:
+  - /home/feuerbach/source/SuiteSparse-5.7.2/include
+  - /home/feuerbach/source/sundials/instdir/include
+extra-lib-dirs:
+  - /home/feuerbach/source/SuiteSparse-5.7.2/lib
+  - /home/feuerbach/source/sundials/instdir/lib64
+ghc-options:
+  "$locals":
+      -optl=-Wl,-rpath,/home/feuerbach/source/SuiteSparse-5.7.2/lib
+      -optl=-Wl,-rpath,/home/feuerbach/source/sundials/instdir/lib64
